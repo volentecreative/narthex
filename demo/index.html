@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en" vci-modal-class="is-visible">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>narthex demo</title>
+<style>
+  :root { --header-height: 0px; }
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #1a2a30; }
+  main { padding: 1.5rem; max-width: 52rem; margin: 0 auto; }
+  section { margin: 2.5rem 0; }
+  h2 { font-size: 1.1rem; margin: 0 0 .5rem; }
+  button, .btn { font: inherit; padding: .5rem .9rem; border: 1px solid #365c65; background: #365c65; color: #fff; border-radius: 4px; cursor: pointer; }
+  .btn.secondary { background: #fff; color: #365c65; }
+
+  /* header */
+  .w-nav { position: sticky; top: 0; height: 56px; background: #26444c; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 1rem; z-index: 5; }
+  .w-nav-button { color: #fff; background: none; border: 1px solid #fff; }
+  .nav-dim { position: fixed; inset: 56px 0 0 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .nav-dim.is-open { opacity: 1; pointer-events: auto; }
+
+  /* modal shell: host is the full-viewport layer */
+  .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal.is-visible { display: flex; }
+  .modal-dim { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .modal-dialog { position: relative; background: #fff; padding: 1.5rem; border-radius: 8px; width: min(90vw, 28rem); }
+
+  /* drawer: host + sliding panel + scrim */
+  .drawer { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+  .drawer.is-visible { pointer-events: auto; }
+  .drawer-scrim { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .25s; }
+  .drawer.is-visible .drawer-scrim { opacity: .5; }
+  .drawer-panel { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 12px 12px 0 0; transform: translateY(100%); transition: transform .25s ease; padding: 0 1rem 1rem; }
+  .drawer-panel.is-visible { transform: translateY(0); }
+  .drawer-handle { padding: .75rem 0; text-align: center; cursor: grab; }
+  .drawer-handle::before { content: ""; display: block; width: 36px; height: 4px; border-radius: 2px; background: #ccc; margin: 0 auto .5rem; }
+  @media (min-width: 992px) {
+    .drawer { position: static; pointer-events: auto; }
+    .drawer-scrim { display: none; }
+    .drawer-panel { position: static; transform: none; border: 1px solid #ddd; border-radius: 8px; }
+  }
+
+  /* accordion: presentation only — narthex owns the collapse mechanics */
+  .acc-item { border-top: 1px solid #ddd; }
+  .acc-item:last-child { border-bottom: 1px solid #ddd; }
+  .acc-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; color: inherit; padding: .9rem 0; text-align: left; cursor: pointer; font-weight: 600; }
+  .acc-text > :last-child { margin-bottom: 1rem; }
+
+</style>
+</head>
+<body>
+<header class="w-nav" vci-nav="header">
+  <strong>narthex demo</strong>
+  <button class="w-nav-button" type="button" aria-label="menu" onclick="this.classList.toggle('w--open')">☰</button>
+</header>
+<div class="nav-dim" vci-nav="dim"></div>
+
+<main>
+  <p>Header height: <code id="hh"></code></p>
+
+  <section>
+    <h2>Modal</h2>
+    <button type="button" vci-modal="open" vci-modal-key="connect" vci-modal-value="Josh">Open connect modal</button>
+    <button type="button" vci-modal="open" vci-modal-key="global-search">Open search (id-resolved)</button>
+  </section>
+
+  <section>
+    <h2>Drawer</h2>
+    <button type="button" vci-modal="open" vci-modal-key="filters">Open filters drawer</button>
+    <div class="drawer" vci-modal="drawer" vci-modal-key="filters" vci-modal-inline="(min-width: 992px)">
+      <div class="drawer-scrim" vci-modal="scrim"></div>
+      <div class="drawer-panel" vci-modal="part">
+        <div class="drawer-handle" vci-modal="handle">Filters</div>
+        <button type="button" vci-modal="close">Close</button>
+        <p>Drawer body. On desktop (≥992px) this is inline content.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Accordion</h2>
+    <div vci-accordion="group" vci-accordion-single="true" id="faq">
+      <div class="acc-item" vci-accordion="item" vci-accordion-open="true">
+        <h3><button class="acc-trigger" type="button" vci-accordion="trigger">First question <span vci-accordion="icon">⌄</span></button></h3>
+        <div vci-accordion="body"><div class="acc-text"><p>First answer.</p></div></div>
+      </div>
+      <div class="acc-item" vci-accordion="item">
+        <h3><button class="acc-trigger" type="button" vci-accordion="trigger">Second question <span vci-accordion="icon">⌄</span></button></h3>
+        <div vci-accordion="body"><div class="acc-text"><p>Second answer with <a href="#">a link</a>.</p></div></div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:1.5rem">Rich text → accordion</h2>
+    <div id="rt" vci-accordion="richtext" vci-accordion-item-class="acc-item" vci-accordion-trigger-class="acc-trigger" vci-accordion-text-class="acc-text">
+      <p>Intro before any section.</p>
+      <h1>Kids</h1>
+      <p>Section intro copy.</p>
+      <h2>Nursery</h2>
+      <p>Birth to 2.</p>
+      <h2>Preschool</h2>
+      <p>Ages 3–5.</p>
+      <hr>
+      <p>Closing paragraph for the page.</p>
+      <h1>Youth</h1>
+      <h3>Middle school</h3>
+      <p>Grades 6–8.</p>
+    </div>
+  </section>
+
+
+  <p><a href="#faq">Anchor to FAQ</a></p>
+</main>
+
+<!-- modals live at body level -->
+<div class="modal" vci-modal="dialog" vci-modal-key="connect">
+  <div class="modal-dim" vci-modal="dim"></div>
+  <div class="modal-dialog" role="document">
+    <h3 vci-modal="title">Connect</h3>
+    <form><input type="text" vci-modal="field" placeholder="filled on open" name="who"><br><button type="button" vci-modal="close">Close</button></form>
+  </div>
+</div>
+<div class="modal" vci-modal="dialog" vci-modal-key="global-search">
+  <div class="modal-dim" vci-modal="dim"></div>
+  <div class="modal-dialog" id="global-search"><h3>Search</h3><input id="search-input" type="search"><button type="button" vci-modal="close">Close</button></div>
+</div>
+
+<script src="../dist/narthex.js" vci-scroll="native"></script>
+<script>
+  document.getElementById('hh').textContent = getComputedStyle(document.documentElement).getPropertyValue('--header-height');
+</script>
+</body>
+</html>
