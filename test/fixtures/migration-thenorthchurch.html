@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>thenorthchurch migration fixture</title>
+<style>
+  body { margin: 0; font: 16px system-ui; }
+  .navbar { position: sticky; top: 0; height: 64px; background: #26444c; color: #fff; }
+  .navbar_menu-dim { position: fixed; inset: 64px 0 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; }
+  .navbar_menu-dim.navbar_menu-dim-open { opacity: 1; pointer-events: auto; }
+  .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 10; }
+  .modal.is-visible { display: flex; }
+  .modal-dim { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .modal-dialog { position: relative; background: #fff; padding: 1rem; width: 20rem; }
+  .modal .padding_global { position: relative; z-index: 1; }
+  .drawer { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  .drawer.is-visible { pointer-events: auto; }
+  .drawer .modal-dim { opacity: 0; transition: opacity .25s; }
+  .drawer.is-visible .modal-dim { opacity: .5; }
+  .drawer_panel { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; transform: translateY(100%); transition: transform .25s; padding: 1rem; }
+  .drawer_panel.is-visible { transform: none; }
+  @media (min-width: 992px) { .drawer { position: static; pointer-events: auto; } .drawer .modal-dim { display: none; } .drawer_panel { position: static; transform: none; } }
+  .team-modal_form-wrap { display: none; }
+  .team-modal_form-wrap.is-open { display: block; }
+  .accordion-body-inner { overflow: hidden; min-height: 0; }
+</style>
+</head>
+<body>
+<!-- navbar component (Webflow NavbarWrapper) -->
+<div class="navbar w-nav" vci-nav="header">
+  <div class="w-nav-button" role="button" tabindex="0" onclick="this.classList.toggle('w--open')">menu</div>
+  <a href="#" class="navbar_link" data-modal-open="north-update" vci-modal="open" vci-modal-key="north-update">North Update</a>
+  <a href="#" class="navbar_link emphasize" data-modal-open="connect" vci-modal="open" vci-modal-key="connect">Connect</a>
+  <a href="#" class="search-button" data-modal-open="search" aria-controls="global-search">Search</a>
+  <div class="navbar_menu-dim" vci-nav="dim" vci-nav-dim-class="navbar_menu-dim-open"></div>
+</div>
+
+<main>
+  <!-- button component: root Link carries data-modal-open bound to "Open Modal" prop; empty for ordinary buttons -->
+  <a href="/give" class="button" data-modal-open="" vci-modal="open" vci-modal-key="" id="plain-button">Give (ordinary link)</a>
+  <a href="#" class="button" data-modal-open="connect" vci-modal="open" vci-modal-key="connect" id="button-connect">Connect (button component)</a>
+
+  <!-- leadership: collection item is the trigger (a div), key bound to CMS slug -->
+  <div class="people-grid_item" data-modal-open="jane-doe" vci-modal="open" vci-modal-key="jane-doe" id="card-jane">
+    <a href="#" class="person-card">Jane Doe</a>
+  </div>
+
+  <!-- media page: drawer instance, Drawer ID prop = "sermon-filters" -->
+  <a href="#" class="button" data-modal-open="sermon-filters" vci-modal="open" vci-modal-key="sermon-filters" id="open-filters">Filters</a>
+  <div class="drawer" data-modal="sermon-filters" data-modal-desktop-inline vci-modal="drawer" vci-modal-key="sermon-filters" vci-modal-inline="(min-width: 992px)">
+    <div class="modal-dim is-drawer-dim" data-modal-close data-drawer-scrim aria-hidden="true" vci-modal="scrim"></div>
+    <div class="drawer_panel" data-drawer-part vci-modal="part">
+      <div class="drawer_header" data-drawer-handle vci-modal="handle"><div class="drawer_grab-bar"></div><h2>Filters</h2>
+        <button type="button" class="icon-button" data-modal-close vci-modal="close" aria-label="Close filters">×</button></div>
+      <div class="drawer_body"><label><input type="checkbox"> Romans</label></div>
+    </div>
+  </div>
+
+  <!-- FAQ (faq component): DynamoItem.accordion-item, heading is a div -->
+  <div class="faq-wrapper-list">
+    <div class="accordion-item" vci-accordion="item" id="faq-1">
+      <div class="vert-flex">
+        <div class="accordion-heading" vci-accordion="trigger"><p>Question one</p><svg class="icon-regular" vci-accordion="icon" width="16" height="16"><path d="M0 0h16v16z"/></svg></div>
+        <div class="accordion-body" vci-accordion="body"><div class="accordion-body-inner"><div class="accordion-body-text"><p>Answer one <a href="#" id="faq-link">link</a></p></div></div></div>
+      </div>
+    </div>
+    <div class="accordion-item" vci-accordion="item" id="faq-2">
+      <div class="vert-flex">
+        <div class="accordion-heading" vci-accordion="trigger"><p>Question two</p><svg class="icon-regular" vci-accordion="icon" width="16" height="16"><path d="M0 0h16v16z"/></svg></div>
+        <div class="accordion-body" vci-accordion="body"><div class="accordion-body-inner"><div class="accordion-body-text"><p>Answer two</p></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ministries template: Opportunities rich text -->
+  <div class="w-richtext" id="opps" vci-accordion="richtext"
+       vci-accordion-section-tag="h4" vci-accordion-item-tag="h5"
+       vci-accordion-title-class="acc-section-title" vci-accordion-heading-class="acc-item-heading"
+       vci-accordion-stack-class="vert-flex" vci-accordion-item-class="accordion-item"
+       vci-accordion-trigger-class="accordion-heading text-size-regular text-weight-bold text-color-inherit"
+       vci-accordion-icon-class="icon-regular text-color-inherit" vci-accordion-body-class="accordion-body"
+       vci-accordion-inner-class="accordion-body-inner" vci-accordion-text-class="accordion-body-text">
+    <h1>Kids</h1>
+    <p>Intro.</p>
+    <h2>Nursery</h2>
+    <p>Birth to 2.</p>
+    <hr>
+    <p>Closing.</p>
+    <h1>Youth</h1>
+    <h2>Middle school</h2>
+    <p>Grades 6–8.</p>
+    <p> </p>
+    <p>Closing two.</p>
+  </div>
+
+  <a href="#faq-2" id="anchor">jump</a>
+</main>
+
+<!-- global-modals: modal-connect (form id wf-form-connect), modal-north-update (#north-update), modal-search (handler-owned) -->
+<div class="modal" vci-modal="dialog" vci-modal-key="connect">
+  <div class="padding_global"><div class="modal-dialog">
+    <div class="horz-space-between"><h3>Connect</h3><div class="close-wrapper" vci-modal="close" role="button" tabindex="0" aria-label="Close"><div class="close">×</div></div></div>
+    <form id="wf-form-connect" data-name="connect"><input type="text" name="name"><button type="submit">Send</button></form>
+  </div></div>
+  <div class="modal-dim" vci-modal="dim"></div>
+</div>
+<div class="modal" vci-modal="dialog" vci-modal-key="north-update">
+  <div class="padding_global"><div class="modal-dialog" id="north-update">
+    <div class="horz-space-between"><h3>North Update</h3><div class="close-wrapper" vci-modal="close" role="button" tabindex="0" aria-label="Close"><div class="close">×</div></div></div>
+    <p>Mailchimp embed</p>
+  </div></div>
+  <div class="modal-dim" vci-modal="dim"></div>
+</div>
+<div class="modal" id="search-shell">
+  <div class="padding_global"><div class="search-dialog" id="global-search" role="dialog"><input id="search-input" type="search"><div class="icon-button"><div class="close">×</div></div></div></div>
+  <div class="modal-dim" aria-hidden="true"></div>
+</div>
+
+<!-- leadership team modal: collection item; .modal domId bound to slug -->
+<div class="team-modal_list">
+  <div class="w-dyn-item">
+    <div class="modal" id="jane-doe" vci-modal="dialog" vci-modal-key="jane-doe">
+      <div class="padding_global"><div class="modal-dialog">
+        <div class="horz-space-between"><div><h3 vci-modal="title">Jane Doe</h3><p>Pastor</p></div>
+          <div class="close-wrapper" data-modal-close vci-modal="close" role="button" tabindex="0" aria-label="Close"><svg width="16" height="16"><path d="M0 0h16v16z"/></svg></div></div>
+        <a href="#" class="button is-secondary" data-team-contact-toggle>Contact</a>
+        <div class="team-modal_form-wrap" data-team-contact-form>
+          <form id="email-form"><input type="text" id="name" name="Name"><input type="text" class="hidden" id="field-2" data-team-member-field vci-modal="field" name="Team Member"><button type="submit">Send</button></form>
+        </div>
+      </div></div>
+      <div class="modal-dim" vci-modal="dim"></div>
+    </div>
+  </div>
+</div>
+
+<!-- the site footer custom code, v2 -->
+<script src="../../dist/narthex.js" vci-scroll="native" vci-scroll-offset="calc(var(--header-height) + var(--_spacing---gutter))"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-newtab]').forEach(function (link) { link.target = '_blank'; link.rel = 'noopener noreferrer'; });
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-team-contact-toggle]');
+    if (!t) return;
+    e.preventDefault();
+    var m = t.closest('[vci-modal="dialog"]') || t.closest('.modal');
+    var form = m && m.querySelector('[data-team-contact-form]');
+    if (form) form.classList.toggle('is-open');
+  });
+</script>
+<!-- stand-in for search-modal-handler.html: owns its own modal via [data-modal-open="search"] -->
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var dialog = document.getElementById('global-search'); var modal = dialog.closest('.modal');
+  document.querySelectorAll('[data-modal-open="search"]').forEach(function (t) { t.addEventListener('click', function (e) { e.preventDefault(); modal.classList.add('is-visible'); }); });
+  modal.querySelector('.icon-button').addEventListener('click', function () { modal.classList.remove('is-visible'); });
+});
+</script>
+</body>
+</html>
