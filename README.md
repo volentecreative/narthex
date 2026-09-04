@@ -5,9 +5,9 @@ One script, one attribute vocabulary, no per-site reinvention.
 
 The idea is [Finsweet Attributes](https://finsweet.com/attributes) but for the
 things we keep rebuilding on every build: modals and bottom-sheet drawers,
-accordions (including rich-text-to-accordion), header offsets, native smooth
-scroll, new-tab links, class toggles, Finsweet list helpers, a YouTube
-livestream notice, and CSS injection into web-component shadow roots.
+accordions (including rich-text-to-accordion), header offsets, and native
+smooth scroll. Site-specific behaviour (a church's livestream notice, a
+MinistryPlatform widget theme) stays in that site's own repo.
 
 ```html
 <!-- everything -->
@@ -18,11 +18,9 @@ livestream notice, and CSS injection into web-component shadow roots.
 <script src="https://cdn.jsdelivr.net/gh/volentecreative/narthex@v0.1.0/dist/accordion.min.js"></script>
 ```
 
-Put it in **Site settings → Custom code → Footer** as a plain script (no
-`async`/`defer` — the `fslist` helper has to beat Finsweet's deferred module,
-and everything else waits for `DOMContentLoaded` on its own). Loading two
-module files on one page is fine: the core installs once and each module
-registers once.
+Put it in **Site settings → Custom code → Footer**. Every module waits for
+`DOMContentLoaded` on its own, so `defer` is fine. Loading two module files on
+one page is fine too: the core installs once and each module registers once.
 
 > **jsDelivr only serves public repositories.** This repo has to be public for
 > the URLs above to resolve. Nothing in it is secret — site-specific keys stay
@@ -69,11 +67,6 @@ cannot drift.
 | **accordion** | [`src/modules/accordion.js`](src/modules/accordion.js) | Roles `item` / `trigger` / `body` / `icon` / `group`. Owns the collapse mechanics (grid-rows animation, `aria-expanded`, `inert`) and leaves the look to your classes. `vci-accordion="richtext"` converts a rich-text field: H1 → section, H2–H6 → row, `<hr>` closes a row. |
 | **nav** | [`src/modules/nav.js`](src/modules/nav.js) | `header` writes `--header-height` and `--nav-offset` to `<html>`. `dim` follows Webflow's navbar open state (the only signal is the `w--open` class on `.w-nav-button`), closes the menu on click, and shares the scroll lock with modal. |
 | **scroll** | [`src/modules/scroll.js`](src/modules/scroll.js) | `<script … vci-scroll="native">` turns off Webflow's jQuery anchor scroll and uses `scroll-behavior: smooth` + `:target { scroll-margin-top }`, which respects the header offset and reduced-motion. |
-| **utils** | [`src/modules/utils.js`](src/modules/utils.js) | `vci-newtab` (`="external"` for other hosts only), `vci-toggle="trigger|target|scope"` class toggling with `aria-expanded`, `vci-empty="hide"` for a section whose Collection List rendered empty. |
-| **fslist** | [`src/modules/fslist.js`](src/modules/fslist.js) | For Finsweet list filters: `label-value` copies checkbox label text into `fs-list-value` (Webflow can't CMS-bind attribute values); `deeplink` ticks the option named by `?<param>=` once Finsweet is ready. |
-| **livestream** | [`src/modules/livestream.js`](src/modules/livestream.js) | Reveals a `link` and fills `embed`/`player` iframes when a YouTube channel is live. Quota-aware: channel id cached forever, live check cached per session and only on configured days. Key + handle are attributes on the script tag. |
-| **shadow-css** | [`src/modules/shadow-css.js`](src/modules/shadow-css.js) | Appends a stylesheet `<link>` inside web components' open shadow roots — the only way to style MinistryPlatform's `<mpp-*>` widgets. Per element or per tag list. |
-
 Every module exposes an API on `window.vci.<module>` and fires
 `vci:<module>:<event>` DOM events (bubbling, with `detail`), so site-specific
 code can listen instead of watching class mutations.
@@ -112,10 +105,9 @@ code can listen instead of watching class mutations.
      vci-accordion-item-class="accordion-item"
      vci-accordion-trigger-class="accordion-heading text-size-regular text-weight-bold"></div>
 
-<!-- header + livestream config on the script tag -->
+<!-- header measurement + native smooth scroll -->
 <header class="navbar w-nav" vci-nav="header">…</header>
-<script src="…/narthex.min.js" vci-scroll="native"
-        vci-livestream-key="AIza…" vci-livestream-handle="thenorthchurch"></script>
+<script src="…/narthex.min.js" vci-scroll="native"></script>
 ```
 
 The demo page [`demo/index.html`](demo/index.html) has a working instance of
@@ -174,21 +166,19 @@ listing every role, setting, event and API, no dependencies. Modules register
 with `vci.define('<name>', function (vci) { … return api; })` and do their own
 `vci.ready()`.
 
-## Not in narthex (yet)
+## What stays in a site's own repo
 
-Things that were reviewed for the first release and deliberately left where
-they are, with the reason:
+narthex is for behaviour every build needs. Things that belong to one site's
+stack stay with that site, even when they are attribute-driven:
 
-- **The North Church search modal** (Algolia renderer) — coupled to that index's
-  record shapes and card templates. It can adopt `vci-modal` for open/close and
-  listen for `vci:modal:open` to lazy-load Algolia, but the renderer itself is
-  site code.
-- **Page-nav-menu tab padding solver** — a bespoke layout algorithm for one
-  component; would need its own design pass to generalise.
-- **MinistryPlatform auth state / account tabs / custom-form styles** — the
-  registered scripts are hosted on Webflow's CDN, which the session that
-  wrote this could not reach. They are MP-specific and would form a separate
-  `mp` namespace here once their sources are in a repo.
+- **The North Church**: the YouTube livestream notice, the MinistryPlatform
+  shadow-root theme injector, the Finsweet label-value / deep-link helpers,
+  the Algolia search modal renderer, and the MP auth scripts. They live in
+  `thenorthchurch/webflow/` and in that site's page custom code, and they run
+  alongside narthex without conflict (different attributes, shared nothing).
+- Small one-off helpers (`data-newtab`, a class toggle) are cheaper as five
+  lines of site code than as a versioned module. If the same helper shows up
+  on a third site, that is the signal to add it here.
 
 ## Migrating an existing site
 

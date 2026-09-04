@@ -4,10 +4,6 @@
     "modal",
     "accordion",
     "nav",
-    "scroll",
-    "utils",
-    "fslist",
-    "livestream",
-    "shadow-css"
+    "scroll"
   ]
 }

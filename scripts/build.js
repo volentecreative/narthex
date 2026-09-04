@@ -12,7 +12,7 @@ const core = readFileSync(join(root, 'src/core.js'), 'utf8').replace('__VERSION_
 
 // Order matters only for the bundle: modules are independent, but modal and
 // nav share the scroll lock, so nav registering first is a nice-to-have.
-const ORDER = ['modal', 'accordion', 'nav', 'scroll', 'utils', 'fslist', 'livestream', 'shadow-css'];
+const ORDER = ['modal', 'accordion', 'nav', 'scroll'];
 const files = readdirSync(join(root, 'src/modules')).filter((f) => f.endsWith('.js')).map((f) => basename(f, '.js'));
 const modules = [...ORDER.filter((m) => files.includes(m)), ...files.filter((m) => !ORDER.includes(m))];
 

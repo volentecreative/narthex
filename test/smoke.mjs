@@ -20,16 +20,6 @@ async function open(opts = {}) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-  // Stub YouTube so the livestream module can be exercised offline.
-  await page.addInitScript(() => {
-    const real = window.fetch;
-    window.fetch = (u, ...a) => {
-      const s = String(u);
-      if (s.includes('youtube/v3/channels')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: 'UC123' }] }), { status: 200 }));
-      if (s.includes('youtube/v3/search')) return Promise.resolve(new Response(JSON.stringify({ items: [{ id: { videoId: 'VID42' } }] }), { status: 200 }));
-      return real(u, ...a);
-    };
-  });
   await page.goto(url + (opts.query || ''));
   return { page, ctx, errors };
 }
@@ -160,51 +150,6 @@ console.log('scroll');
   const { page, ctx } = await open();
   ok(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior === 'smooth'), 'smooth scroll on');
   ok(await page.evaluate(() => !!document.querySelector('style[vci-style="scroll"]')?.textContent.includes('scroll-margin-top:var(--header-height, 0px)')), ':target offset injected');
-  await ctx.close();
-}
-
-console.log('utils');
-{
-  const { page, ctx } = await open();
-  ok(await page.$eval('#ext', (a) => a.target === '_blank' && /noopener/.test(a.rel)), 'external link gets _blank');
-  ok(await page.$eval('#int', (a) => a.target !== '_blank'), 'internal link left alone under "external"');
-  ok(await page.$eval('#nt', (a) => a.target === '_blank'), 'explicit vci-newtab');
-  await page.click('[vci-toggle="trigger"]');
-  ok(await page.$eval('[vci-toggle="target"]', (e) => e.classList.contains('is-open')), 'toggle opens target in scope');
-  ok(await page.$eval('[vci-toggle="trigger"]', (e) => e.getAttribute('aria-expanded') === 'true'), 'toggle aria-expanded');
-  await page.click('[vci-toggle="trigger"]');
-  ok(await page.$eval('[vci-toggle="target"]', (e) => !e.classList.contains('is-open')), 'toggle closes');
-  ok(await page.$eval('#emptybox', (e) => getComputedStyle(e).display === 'none'), 'vci-empty="hide" hides empty list');
-  await ctx.close();
-}
-
-console.log('fslist');
-{
-  const { page, ctx } = await open({ query: '?series=genesis' });
-  ok(await page.$$eval('#filters input', (l) => l[0].getAttribute('fs-list-value') === 'Romans' && l[1].getAttribute('fs-list-value') === 'Genesis'), 'label text copied to fs-list-value');
-  await page.waitForTimeout(100);
-  ok(await page.$$eval('#deep input', (l) => l[1].checked && !l[0].checked), 'deeplink ticks the matching option (case-insensitive)');
-  // Finsweet callback registered
-  ok(await page.evaluate(() => Array.isArray(window.FinsweetAttributes) && window.FinsweetAttributes[0][0] === 'list'), 'registers FinsweetAttributes list callback');
-  await ctx.close();
-}
-
-console.log('shadow-css');
-{
-  const { page, ctx } = await open();
-  await page.waitForTimeout(100);
-  ok(await page.$eval('demo-widget', (e) => !!e.shadowRoot.querySelector('link[vci-shadow-css-link]')), 'per-element url injected into shadow root');
-  ok(await page.$eval('other-widget', (e) => !!e.shadowRoot.querySelector('link[vci-shadow-css-link]')), 'tag-list url injected into shadow root');
-  ok(await page.$eval('other-widget', (e) => e.shadowRoot.querySelectorAll('link').length === 1), 'injected once');
-  await ctx.close();
-}
-
-console.log('livestream');
-{
-  const { page, ctx } = await open();
-  await page.waitForTimeout(150);
-  ok(await page.$eval('#live-link', (a) => a.style.display === '' && a.href.includes('watch?v=VID42')), 'link revealed with watch URL');
-  ok(await page.$eval('#live-player iframe', (f) => f.src.includes('/embed/VID42')), 'player iframe gets the live video');
   await ctx.close();
 }
 

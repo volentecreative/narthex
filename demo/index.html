@@ -46,8 +46,6 @@
   .acc-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; color: inherit; padding: .9rem 0; text-align: left; cursor: pointer; font-weight: 600; }
   .acc-text > :last-child { margin-bottom: 1rem; }
 
-  .contact-form { display: none; }
-  .contact-form.is-open { display: block; }
 </style>
 </head>
 <body>
@@ -109,51 +107,6 @@
     </div>
   </section>
 
-  <section>
-    <h2>Toggle</h2>
-    <div vci-toggle="scope">
-      <a href="#" class="btn secondary" vci-toggle="trigger">Contact this person</a>
-      <div class="contact-form" vci-toggle="target"><p>Form goes here.</p></div>
-    </div>
-  </section>
-
-  <section>
-    <h2>New tab</h2>
-    <p vci-newtab="external"><a id="ext" href="https://example.com/">external</a> · <a id="int" href="/local">internal</a></p>
-    <a id="nt" href="https://example.org/" vci-newtab>explicit</a>
-  </section>
-
-  <section>
-    <h2>Finsweet list helpers</h2>
-    <form vci-fslist="label-value" vci-fslist="deeplink" id="filters">
-      <div vci-fslist="label-value" vci-fslist-param="series">
-        <label><input type="checkbox" fs-list-field="series"> Romans</label>
-        <label><input type="checkbox" fs-list-field="series"> Genesis</label>
-      </div>
-    </form>
-    <div vci-fslist="deeplink" vci-fslist-param="series" id="deep">
-      <label><input type="checkbox" fs-list-field="series" fs-list-value="Romans"> Romans</label>
-      <label><input type="checkbox" fs-list-field="series" fs-list-value="Genesis"> Genesis</label>
-    </div>
-  </section>
-
-  <section>
-    <h2>Empty list</h2>
-    <div vci-empty="hide" id="emptybox"><div class="w-dyn-list"><div class="w-dyn-empty">No items</div></div></div>
-    <p>The box above should be hidden.</p>
-  </section>
-
-  <section>
-    <h2>Shadow CSS</h2>
-    <demo-widget vci-shadow-css="/demo/theme.css"></demo-widget>
-    <other-widget></other-widget>
-  </section>
-
-  <section>
-    <h2>Livestream</h2>
-    <a id="live-link" href="#" vci-livestream="link">Watch live</a>
-    <div id="live-player" vci-livestream="player"><iframe title="live"></iframe></div>
-  </section>
 
   <p><a href="#faq">Anchor to FAQ</a></p>
 </main>
@@ -171,14 +124,7 @@
   <div class="modal-dialog" id="global-search"><h3>Search</h3><input id="search-input" type="search"><button type="button" vci-modal="close">Close</button></div>
 </div>
 
-<script>
-  customElements.define('demo-widget', class extends HTMLElement { connectedCallback(){ this.attachShadow({mode:'open'}).innerHTML='<p>shadow</p>'; } });
-  customElements.define('other-widget', class extends HTMLElement { connectedCallback(){ this.attachShadow({mode:'open'}).innerHTML='<p>other</p>'; } });
-</script>
-<script src="../dist/narthex.js"
-        vci-scroll="native"
-        vci-shadow-css="/demo/theme.css" vci-shadow-css-tags="other-widget"
-        vci-livestream-key="demo-key" vci-livestream-handle="@demo" vci-livestream-days="all"></script>
+<script src="../dist/narthex.js" vci-scroll="native"></script>
 <script>
   document.getElementById('hh').textContent = getComputedStyle(document.documentElement).getPropertyValue('--header-height');
 </script>

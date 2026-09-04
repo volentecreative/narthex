@@ -16,15 +16,8 @@ Site settings → Custom code → **Footer**, above the existing `<script>` bloc
 ```html
 <script src="https://cdn.jsdelivr.net/gh/volentecreative/narthex@v0.1.0/dist/narthex.min.js"
         vci-scroll="native"
-        vci-livestream-key="AIzaSyCuZVn83sTy4i_j3-3e9u8GfPiXn5FNPSc"
-        vci-livestream-handle="thenorthchurch"
-        vci-shadow-css="https://cdn.prod.website-files.com/695edb3de14cbcfe30f55baf/6a9a4f8daaffd3efb5dec931_mp-widget-theme-v4.css"
-        vci-shadow-css-tags="mpp-user-login,mpp-household,mpp-my-groups,mpp-subscriptions,mpp-my-invoices,mpp-my-giving,mpp-my-mission-trips,mpp-online-directory,mpp-event-details,mpp-invoice-payment,mpp-custom-form,mpp-checkout,mpp-group-details,mpp-event-finder,mpp-opportunity-details,mpp-group-finder"></script>
+        vci-scroll-offset="calc(var(--header-height) + var(--_spacing---gutter))"></script>
 ```
-
-The YouTube key is already public in the page source today (it lives in the
-footer embed); it is referrer-restricted in Google Cloud, which is the real
-control. Keep it that way.
 
 ## 2. Modal + drawer engine (site footer script → `modal`)
 
@@ -41,7 +34,7 @@ control. Keep it that way.
 | `data-drawer-handle` | `vci-modal="handle"` | `.drawer_header` |
 | `data-team-member-field` | `vci-modal="field"` | hidden input in the leadership contact form |
 | `data-member-name` / `h3` fallback | `vci-modal-value="<name>"` on the card trigger (CMS-bound), or `vci-modal="title"` on the `h3` | person-card trigger / modal heading |
-| `data-team-contact-toggle` / `data-team-contact-form` | `vci-toggle="trigger"` / `vci-toggle="target"` inside a `vci-toggle="scope"` wrapper (the modal dialog) | leadership modal |
+| `data-team-contact-toggle` / `data-team-contact-form` | unchanged — stays as a five-line site script in the footer (see §5) | leadership modal |
 | `.navbar_menu-dim` click + `.navbar_menu-dim-open` | `vci-nav="dim"` + `vci-nav-dim-class="navbar_menu-dim-open"` | navbar component |
 
 Keys stay what they are: `connect`, `north-update`, `global-search`, and the
@@ -95,59 +88,35 @@ rotation rule can be deleted: narthex injects equivalents keyed on
 `vci-accordion-state`, which also fixes nested accordions (the class-based
 rule would have opened inner bodies with their parent).
 
-## 4. Header, scroll, new-tab (site footer → `nav`, `scroll`, `utils`)
+## 4. Header and scroll (site footer → `nav`, `scroll`)
 
 | Today | narthex |
 | --- | --- |
 | `.navbar` measured into `--header-height` / `--nav-offset` | `vci-nav="header"` on the navbar root. Variable names are the defaults. |
 | `html { scroll-behavior: smooth }`, `:target { scroll-margin-top: calc(var(--header-height) + var(--_spacing---gutter)) }`, `$(document).off('click.wf-scroll')` | `vci-scroll="native"` on the script tag; `vci-scroll-offset="calc(var(--header-height) + var(--_spacing---gutter))"` to keep the gutter |
-| `[data-newtab]` | `vci-newtab` |
-| `[data-hide-if-empty]` + `:has(.w-dyn-empty)` (Ministries template) | `vci-empty="hide"`. The second rule (hide `a[href="#events"]` when `#events` is empty) stays as page CSS — it is a one-off. |
 
-## 5. Finsweet helpers (`/media`, `/events` page code → `fslist`)
+## 5. What stays in this repo and in Webflow
 
-| Today | narthex |
-| --- | --- |
-| script copying `label.sermons_check` / `label.filter_check` text into `fs-list-value` | `vci-fslist="label-value"` on the filter form (or each checkbox group) |
-| `?series=<Name>` on `/media` | `vci-fslist="deeplink" vci-fslist-param="series"` on the series checkbox group |
-| `?ministry=<Name>` on `/events` | `vci-fslist="deeplink" vci-fslist-param="ministry" vci-fslist-field="ministry"` on the ministry group |
+Site-specific, and deliberately not in narthex:
 
-Keep Finsweet's own `<script type="module" … fs-list>` tag on those pages.
+| Thing | Where it lives | Note |
+| --- | --- | --- |
+| Livestream notice + `/live` player | `webflow/livestream-handler.html` (embed in the `footer` component) | unchanged |
+| MP widget theme injector | `webflow/mp-theme-injector.js` (registered script `tnc_mp_theme_injector_v4`) | unchanged |
+| Finsweet label → `fs-list-value` and `?series=` / `?ministry=` deep links | `/media` and `/events` page footer code | unchanged |
+| `data-newtab`, `data-team-contact-toggle` | site footer custom code | keep as one small script once the modal engine is deleted — the toggle currently rides inside the modal IIFE's click handler |
+| `[data-hide-if-empty]` CSS | Ministries template page code | unchanged |
+| Search modal renderer | `webflow/search-modal-handler.html` | switch its open/close to `vci:modal:*` events (§2) |
+| MP auth state / user fields / custom-form styles / account tabs | registered scripts | unchanged |
 
-## 6. Livestream (`livestream-handler.html` embed in `footer` → `livestream`)
+## 6. Delete list (only after every hook above is moved)
 
-| Today | narthex |
-| --- | --- |
-| `[sunday-livestream-link]` | `vci-livestream="link"` |
-| `[sunday-livestream-embed]` (home hero) | `vci-livestream="embed"` |
-| `[sunday-livestream-embed="fallback"]` (`/live`) | `vci-livestream="player"` |
-| key / handle constants in the script | `vci-livestream-key` / `vci-livestream-handle` on the script tag |
-| Sunday-only in America/Chicago, `?livestream=test` | defaults — `vci-livestream-days="sun"`, `vci-livestream-tz="America/Chicago"`, `vci-livestream-test="livestream=test"` |
+- Site footer custom code: the modal/drawer IIFE (after lifting its
+  `data-team-contact-toggle` branch into a small standalone script), the
+  navbar offset IIFE, the smooth-scroll style + `Webflow.push` block, the
+  accordion style + script. **Keep** the `data-newtab` script and the
+  `.page-nav-menu` mask CSS.
+- Repo files: the script half of `webflow/rich-text-accordion.html` (its CSS
+  stays, with the selectors from §3).
 
-The `.livestream-notice:hover .livestream-color-overlay` rule stays in the
-embed (or moves to site head CSS).
-
-## 7. Shadow-root theme (`mp-theme-injector.js`, registered script `tnc_mp_theme_injector_v4` → `shadow-css`)
-
-Replaced entirely by the two `vci-shadow-css*` attributes on the script tag in
-step 1. Remove the registered script from the site footer once verified on
-`/event-details` and `/account`. When the stylesheet is re-uploaded (its URL
-changes every edit), update the attribute — one place instead of a script
-re-registration.
-
-## 8. Delete list (only after every hook above is moved)
-
-- Site footer custom code: the modal/drawer IIFE, the navbar offset IIFE, the
-  smooth-scroll style + `Webflow.push` block, the `data-newtab` script, the
-  accordion style + script. **Keep** the `.page-nav-menu` mask CSS.
-- `footer` component: the livestream embed's `<script>` (keep its `<style>`).
-- `/media` and `/events` page footer code: the two inline scripts (keep
-  Finsweet's tag).
-- Registered script `tnc_mp_theme_injector_v4` (and the v1–v3 leftovers).
-- Repo files: `webflow/livestream-handler.html`, `webflow/mp-theme-injector.js`,
-  the script half of `webflow/rich-text-accordion.html`.
-
-Untouched by this migration: `tnc_search_config`, the MP auth/user-field
-scripts, `tnc_mp_custom_form_styles_v7`, `tnc_mp_widget_shadow_styles_v3`,
-the account page tab script, the `/media` filter-reset registered script, and
-the page-nav-menu solver on `/account`.
+Everything in §5 is untouched by this migration.
