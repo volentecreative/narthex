@@ -1,4 +1,4 @@
-/*! narthex v0.1.0 — modal — https://github.com/volentecreative/narthex
+/*! narthex v0.1.1 — modal — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.1.0';
+  vci.version = '0.1.1';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -197,6 +197,10 @@
  *   backdrop   "false" so clicking the host element itself does not close it.
  *
  * EVENTS  vci:modal:open / vci:modal:close on the host, detail { key, host, trigger }.
+ *
+ * Something else may toggle the open class — a Webflow interaction, site code,
+ * a script that owned the dialog before narthex did. Every host's class is
+ * watched, so the scroll lock, aria and events stay truthful either way.
  * API     vci.modal.open(key, triggerEl?) · close(keyOrEl?) · closeAll() · isOpen(key) · resolve(key)
  */
 vci.define('modal', function (vci) {
@@ -279,6 +283,43 @@ vci.define('modal', function (vci) {
     fields.forEach(function (f) { f.value = v; });
   }
 
+  // Bookkeeping for the open and closed states, separate from the class
+  // change itself so the observer below can apply it when the class was
+  // toggled by someone else.
+  var state = new WeakMap();
+  function applyOpen(el, k, trig) {
+    state.set(el, true);
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    vci.lock.hold(M + ':' + k);
+    triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'true'); });
+    if (trig && trig.setAttribute) trig.setAttribute('aria-expanded', 'true');
+    if (usesUrl(el)) setParam(el, k);
+    vci.emit(el, 'modal:open', { key: k, host: el, trigger: trig || null });
+  }
+  function applyClose(el, k) {
+    state.set(el, false);
+    el.removeAttribute('aria-modal');
+    vci.lock.release(M + ':' + k);
+    triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
+    if (usesUrl(el)) clearParam(el);
+    vci.emit(el, 'modal:close', { key: k, host: el });
+  }
+  function watch(el) {
+    if (state.has(el)) return;
+    state.set(el, el.classList.contains(openClass(el)));
+    new MutationObserver(function () {
+      var open = el.classList.contains(openClass(el));
+      if (open === !!state.get(el)) return;
+      var k = keyOf(el);
+      if (open) applyOpen(el, k, null);
+      else {
+        parts(el).forEach(function (p) { p.classList.remove(openClass(el)); });
+        applyClose(el, k);
+      }
+    }).observe(el, { attributes: true, attributeFilter: ['class'] });
+  }
+
   function show(k, trig) {
     var el = resolve(k);
     if (!el) return false;
@@ -289,18 +330,12 @@ vci.define('modal', function (vci) {
     if (vci.emit(el, 'modal:beforeopen', { key: k, host: el, trigger: trig || null }, true).defaultPrevented) return false;
     openEls().forEach(function (o) { if (o !== el) hide(o, false); });
 
+    watch(el);
     fillFields(el, trig, k);
     lastTrigger = triggerTarget(trig);
+    applyOpen(el, k, trig);
     parts(el).forEach(function (p) { p.classList.add(cls); });
-
-    if (!el.hasAttribute('role')) el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-modal', 'true');
-    vci.lock.hold(M + ':' + k);
-    triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'true'); });
-    if (trig && trig.setAttribute) trig.setAttribute('aria-expanded', 'true');
-    if (usesUrl(el)) setParam(el, k);
     focusInto(el);
-    vci.emit(el, 'modal:open', { key: k, host: el, trigger: trig || null });
     return true;
   }
 
@@ -309,15 +344,11 @@ vci.define('modal', function (vci) {
     if (!el) return false;
     var cls = openClass(el);
     if (!el.classList.contains(cls)) return false;
-    var k = keyOf(el);
+    watch(el);
+    applyClose(el, keyOf(el));
     parts(el).forEach(function (p) { p.classList.remove(cls); });
-    el.removeAttribute('aria-modal');
-    vci.lock.release(M + ':' + k);
-    triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
-    if (usesUrl(el)) clearParam(el);
     if (lastTrigger && restore !== false && lastTrigger.focus) lastTrigger.focus();
     lastTrigger = null;
-    vci.emit(el, 'modal:close', { key: k, host: el });
     return true;
   }
 
@@ -455,7 +486,8 @@ vci.define('modal', function (vci) {
       if (mq) mq.addEventListener('change', function (ev) { if (ev.matches) hide(el, false); });
       // Something already open on load (a Designer state left on, or a class
       // set server-side) still needs the lock and aria.
-      if (el.classList.contains(openClass(el))) { vci.lock.hold(M + ':' + k); el.setAttribute('aria-modal', 'true'); }
+      if (el.classList.contains(openClass(el))) { state.set(el, false); applyOpen(el, k, null); }
+      watch(el);
     });
     var params = new URLSearchParams(w.location.search);
     hosts().some(function (el) {

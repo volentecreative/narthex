@@ -128,9 +128,12 @@ console.log('accordions');
     stack: !!e.querySelector('.accordion-item > .vert-flex > h5.acc-item-heading + .accordion-body > .accordion-body-inner > .accordion-body-text'),
     title: e.querySelector('h4.acc-section-title') && e.querySelector('h4.acc-section-title').textContent,
     icon: !!e.querySelector('.icon-regular svg'),
-    closing: e.children[0].lastElementChild.textContent
+    closing: e.children[0].lastElementChild.textContent,
+    closing2: e.children[1].lastElementChild.textContent,
+    youthItems: e.children[1].querySelectorAll('[vci-accordion="item"]').length
   }));
-  ok(rt.sections === 1 && rt.item === 'item' && rt.trig === 'trigger', 'rich text rebuilt with narthex roles');
+  ok(rt.sections === 2 && rt.item === 'item' && rt.trig === 'trigger', 'rich text rebuilt with narthex roles');
+  ok(rt.closing2 === 'Closing two.' && rt.youthItems === 1, 'empty paragraph closes the row (matches the live embed)');
   ok(rt.stack && rt.title === 'Kids' && rt.icon, 'rich text markup matches the old builder (vert-flex stack, h4/h5, classes, chevron)');
   ok(rt.closing === 'Closing.', 'hr closes the row; closing paragraph stays on the page');
   await page.click('#opps button.accordion-heading');

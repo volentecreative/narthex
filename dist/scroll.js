@@ -1,4 +1,4 @@
-/*! narthex v0.1.0 — scroll — https://github.com/volentecreative/narthex
+/*! narthex v0.1.1 — scroll — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.1.0';
+  vci.version = '0.1.1';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.

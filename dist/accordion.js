@@ -1,4 +1,4 @@
-/*! narthex v0.1.0 — accordion — https://github.com/volentecreative/narthex
+/*! narthex v0.1.1 — accordion — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.1.0';
+  vci.version = '0.1.1';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -182,6 +182,10 @@
  *                             of a section it is intro copy and stays put
  *               <hr>          closes the open row so a closing paragraph belongs to
  *                             the page, not the last panel. The rule is not rendered.
+ *               empty line    does the same (Webflow's editor makes an <hr> awkward
+ *                             to insert; a blank paragraph is what editors can type).
+ *                             Empty means no text — an image or embed on its own line
+ *                             is content. Turn off with vci-accordion-blank="false".
  *
  * SETTINGS (vci-accordion-<setting>)
  *   class      open-state class on the item. Default is-open.
@@ -283,6 +287,12 @@ vci.define('accordion', function (vci) {
   });
 
   /* ---------- rich text -> accordion ---------- */
+  // Webflow writes a non-breaking space into a blank paragraph; strip it
+  // before trimming. Media on its own line is content, not a separator.
+  function isBlank(node) {
+    if (node.querySelector && node.querySelector('img, iframe, video, figure, picture, svg, hr')) return false;
+    return !node.textContent.replace(/\u00a0/g, ' ').trim();
+  }
   function retag(el, newTag) {
     var n = d.createElement(newTag);
     if (el.className) n.className = el.className;
@@ -331,6 +341,7 @@ vci.define('accordion', function (vci) {
     rt.setAttribute(A('accordion-ready'), '1');
     var SECTION_TAG = vci.config(M, 'section-tag', 'h4', rt);
     var ITEM_TAG = vci.config(M, 'item-tag', 'h5', rt);
+    var BLANK = vci.bool(vci.config(M, 'blank', 'true', rt), true);
 
     var kids = Array.prototype.slice.call(rt.children);
     var frag = d.createDocumentFragment();
@@ -366,7 +377,8 @@ vci.define('accordion', function (vci) {
         var built = makeItem(retag(node, ITEM_TAG), rt);
         items.appendChild(built.item);
         itemBody = built.body;
-      } else if (tag === 'HR') {
+      } else if (tag === 'HR' || (BLANK && isBlank(node))) {
+        // Either marker closes the open row and is dropped from the output.
         itemBody = null; items = null;
       } else if (itemBody) {
         itemBody.appendChild(node);

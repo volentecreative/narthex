@@ -9,6 +9,24 @@ Order of work: add the narthex script tag **alongside** the existing code,
 migrate one behaviour at a time (both engines tolerate each other — they key
 off different attributes), then delete the old code once every hook is moved.
 
+## Status — applied 2026-09-04 through the Webflow Data API
+
+Everything below is in the Designer (unpublished) except two attribute
+**bindings**, which the API rejects and which have to be set by hand before
+the site is published:
+
+1. **`button` component** → root Link: add attribute `vci-modal-key` bound to
+   the **Open Modal** prop (the same prop `data-modal-open` is bound to).
+   Without it a button whose Open Modal is set does nothing.
+2. **`/about/leadership`** → each of the five `people-grid_item` Collection
+   Items: add attribute `vci-modal-key` bound to the Team Member **Slug**
+   (the same field `data-modal-open` is bound to). The member modal on the
+   other side already resolves by its slug-bound id.
+
+Then merge + tag narthex `v0.1.1` (the footer points at it) and publish.
+The search modal was left with its own handler (`data-modal-open="search"` on
+the navbar buttons) — see §2.
+
 ## 1. Load narthex
 
 Site settings → Custom code → **Footer**, above the existing `<script>` blocks:
@@ -42,14 +60,19 @@ drawer keys. The `?modal=<key>` URL contract is unchanged (dialogs write it,
 drawers do not), so existing links keep working.
 
 **Search modal handler** (`webflow/search-modal-handler.html`, embed inside
-`modal-search`): it binds its own click handlers on `[data-modal-open="search"]`
-and watches the `.modal` class. After the swap, delete its open/close/trap
-code and replace with:
+`modal-search`) keeps owning its modal for now: it already binds
+`[data-modal-open="search"]`, so the two navbar search buttons were changed
+from `data-modal-open="global-search"` (which only the deleted engine
+resolved) to `data-modal-open="search"`, and nothing else touched it. A later
+pass can hand open/close to narthex (`vci-modal="dialog"` on the `.modal`
+shell, `vci-modal="open"` on the buttons) and have the handler listen:
 
 ```js
 document.addEventListener('vci:modal:open',  function (e) { if (e.detail.key === 'global-search') { loadAlgolia(); input.focus(); input.select(); } });
-document.addEventListener('vci:modal:close', function (e) { if (e.detail.key === 'global-search') { /* nothing: narthex restores focus */ } });
 ```
+
+narthex ≥ 0.1.1 watches the open class, so the handler's own `closeModal()`
+would not strand the scroll lock.
 
 ## 3. Accordion (site footer script + `rich-text-accordion.html` → `accordion`)
 

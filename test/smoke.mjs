@@ -59,6 +59,19 @@ console.log('modal');
     res(got.join(','));
   }));
   ok(seen === 'open:connect,close:connect', 'events fire: ' + seen);
+  // a foreign script removes the class: lock, aria and events must follow
+  await page.evaluate(() => vci.modal.open('connect'));
+  const ext = await page.evaluate(() => new Promise((res) => {
+    document.addEventListener('vci:modal:close', (e) => res(e.detail.key), { once: true });
+    document.querySelector('[vci-modal="dialog"][vci-modal-key="connect"]').classList.remove('is-visible');
+  }));
+  ok(ext === 'connect', 'class removed externally -> vci:modal:close fires');
+  ok(await page.evaluate(() => document.body.style.overflow === '' && !vci.lock.active()), 'external close releases the scroll lock');
+  ok(await page.evaluate(() => !new URL(location.href).searchParams.has('modal')), 'external close clears ?modal=');
+  await page.evaluate(() => document.querySelector('[vci-modal="dialog"][vci-modal-key="connect"]').classList.add('is-visible'));
+  await page.waitForTimeout(20);
+  ok(await page.evaluate(() => vci.lock.active() && document.querySelector('[vci-modal="dialog"][vci-modal-key="connect"]').getAttribute('aria-modal') === 'true'), 'class added externally -> lock + aria applied');
+  await page.evaluate(() => vci.modal.closeAll());
   ok(errors.length === 0, 'no console errors: ' + errors.join(' | '));
   await ctx.close();
 }
@@ -119,6 +132,7 @@ console.log('accordion');
     items: e.querySelectorAll('[vci-accordion="item"]').length,
     order: Array.from(e.children[0].children).map((c) => c.tagName + (c.getAttribute('vci-accordion') ? '.' + c.getAttribute('vci-accordion') : '')).join(' '),
     kids: Array.from(e.children[1].children).map((c) => c.tagName + (c.getAttribute('vci-accordion') ? '.' + c.getAttribute('vci-accordion') : '')).join(' '),
+    youth: Array.from(e.children[2].children).map((c) => c.tagName + (c.getAttribute('vci-accordion') ? '.' + c.getAttribute('vci-accordion') : '')).join(' '),
     firstTrigger: e.querySelector('[vci-accordion="item"] [vci-accordion="trigger"]').className,
     hasIcon: !!e.querySelector('[vci-accordion="icon"] svg')
   }));
@@ -126,6 +140,7 @@ console.log('accordion');
   ok(rt.order === 'P', 'pre-H1 content boxed in its own section: ' + rt.order);
   ok(rt.kids === 'H4.title P DIV.group P', 'section keeps authored order, hr closes the row: ' + rt.kids);
   ok(rt.firstTrigger === 'acc-trigger' && rt.hasIcon, 'classes + chevron applied');
+  ok(rt.youth === 'H4.title DIV.group P', 'blank paragraph closes the row and is dropped: ' + rt.youth);
   await ctx.close();
 }
 
@@ -159,7 +174,7 @@ console.log('bundle isolation');
   const page = await ctx.newPage();
   await page.goto('file://' + join(root, 'test/fixtures/isolation.html'));
   ok(await page.evaluate(() => Object.keys(vci.modules).sort().join(',') === 'accordion,modal'), 'separate dist files share one core, load once each');
-  ok(await page.evaluate(() => vci.version === '0.1.0'), 'version stamped');
+  ok(await page.evaluate(() => vci.version === '0.1.1'), 'version stamped');
   await ctx.close();
 }
 
