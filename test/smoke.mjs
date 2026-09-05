@@ -4,9 +4,11 @@
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const url = 'file://' + join(root, 'demo/index.html');
+const pkgVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 let failures = 0;
 const ok = (cond, msg) => { if (cond) console.log('  ✓', msg); else { failures++; console.log('  ✗', msg); } };
 
@@ -157,6 +159,35 @@ console.log('nav');
   await page.waitForTimeout(50);
   ok(await page.$eval('[vci-nav="dim"]', (e) => !e.classList.contains('is-open')), 'clicking dim closes menu');
   ok(await page.evaluate(() => document.body.style.overflow === ''), 'unlocked after menu closes');
+
+  // plain markup: a hamburger and a panel that are just divs
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.click('[vci-nav="toggle"]');
+  await page.waitForTimeout(50);
+  ok(await page.$eval('[vci-nav="menu"]', (e) => e.classList.contains('is-open')), 'toggle opens a plain menu');
+  ok(await page.$eval('[vci-nav="toggle"]', (e) => e.getAttribute('aria-expanded') === 'true'), 'toggle gets aria-expanded');
+  ok(await page.$eval('.plain-dim', (e) => e.classList.contains('is-open')), 'plain dim follows its own menu');
+  ok(await page.$eval('.nav-dim', (e) => !e.classList.contains('is-open')), 'the other menu\'s dim is untouched');
+  ok(await page.evaluate(() => document.body.style.overflow === 'hidden'), 'plain menu locks scroll');
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(50);
+  ok(await page.$eval('[vci-nav="menu"]', (e) => !e.classList.contains('is-open')), 'Escape closes a plain menu');
+  ok(await page.evaluate(() => document.body.style.overflow === ''), 'unlocked after Escape');
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.click('[vci-nav="toggle"]');
+  await page.waitForTimeout(50);
+  await page.click('[vci-nav="menu"] a[href="#faq"]', { noWaitAfter: true });
+  await page.waitForTimeout(50);
+  ok(await page.$eval('[vci-nav="menu"]', (e) => !e.classList.contains('is-open')), 'a link inside the menu closes it');
+
+  ok(await page.evaluate(() => {
+    window.vci.nav.open(document.querySelector('[vci-nav="menu"]'));
+    const open = window.vci.nav.isOpen(document.querySelector('[vci-nav="menu"]'));
+    window.vci.nav.close(document.querySelector('[vci-nav="menu"]'));
+    return open && !window.vci.nav.isOpen(document.querySelector('[vci-nav="menu"]'));
+  }), 'open/close/isOpen API drives a plain menu');
   await ctx.close();
 }
 
@@ -174,7 +205,7 @@ console.log('bundle isolation');
   const page = await ctx.newPage();
   await page.goto('file://' + join(root, 'test/fixtures/isolation.html'));
   ok(await page.evaluate(() => Object.keys(vci.modules).sort().join(',') === 'accordion,modal'), 'separate dist files share one core, load once each');
-  ok(await page.evaluate(() => vci.version === '0.1.1'), 'version stamped');
+  ok(await page.evaluate((v) => vci.version === v, pkgVersion), `version stamped (${pkgVersion})`);
   await ctx.close();
 }
 
