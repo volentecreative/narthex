@@ -1,6 +1,6 @@
 {
   "name": "narthex",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Attribute-driven JavaScript utilities for Webflow sites, served from jsDelivr.",
   "homepage": "https://github.com/volentecreative/narthex",
   "repository": {
@@ -19,9 +19,9 @@
   "scripts": {
     "build": "node scripts/build.js",
     "check": "node test/check.mjs",
-    "test": "npm run build && npm run check && node test/smoke.mjs",
+    "test": "npm run build && npm run check && node test/smoke.mjs && npm run test:migration",
     "serve": "npx http-server . -p 8787 -c-1",
-    "test:migration": "node test/migration.mjs"
+    "test:migration": "node test/migration.mjs && node test/migration-christtheking.mjs"
   },
   "devDependencies": {
     "playwright": "^1.56.0"

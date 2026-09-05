@@ -18,6 +18,13 @@
   .w-nav-button { color: #fff; background: none; border: 1px solid #fff; }
   .nav-dim { position: fixed; inset: 56px 0 0 0; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .2s; }
   .nav-dim.is-open { opacity: 1; pointer-events: auto; }
+  .plain-nav { position: relative; z-index: 6; display: flex; align-items: center; justify-content: space-between; background: #3b2f4a; color: #fff; padding: .6rem 1rem; }
+  .plain-toggle { color: #fff; background: none; border: 1px solid #fff; cursor: pointer; }
+  .plain-toggle.is-open { background: #fff; color: #3b2f4a; }
+  .plain-menu { position: relative; z-index: 6; display: none; background: #4a3c5c; color: #fff; padding: .75rem 1rem; }
+  .plain-menu.is-open { display: block; }
+  .plain-dim { position: fixed; inset: 0; z-index: 4; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .plain-dim.is-open { opacity: 1; pointer-events: auto; }
 
   /* modal shell: host is the full-viewport layer */
   .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 10; }
@@ -54,6 +61,17 @@
   <button class="w-nav-button" type="button" aria-label="menu" onclick="this.classList.toggle('w--open')">☰</button>
 </header>
 <div class="nav-dim" vci-nav="dim"></div>
+
+<div vci-nav-key="plain">
+  <div class="plain-nav">
+    <strong>plain header (no .w-nav)</strong>
+    <button class="plain-toggle" type="button" vci-nav="toggle">menu</button>
+  </div>
+  <div class="plain-menu" vci-nav="menu">
+    <a href="#faq">Accordion</a>
+  </div>
+  <div class="plain-dim" vci-nav="dim"></div>
+</div>
 
 <main>
   <p>Header height: <code id="hh"></code></p>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>christtheking — narthex migration fixture</title>
+<!-- Markup shaped like the live Christ the King Designer: a hand-built navbar
+     (no Webflow .w-nav anywhere on the site), the ported modal component, and
+     the div-based FAQ accordion. Styling is only what a state needs to be
+     observable from a test. -->
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; }
+  .navbar { position: sticky; top: 0; height: 72px; background: #14171a; color: #fff; z-index: 5; }
+  .padding-global { padding: 0 1.5rem; }
+  .navbar_container { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .navbar_menu { position: relative; z-index: 6; display: none; }
+  .navbar_menu.is-open { display: block; }
+  .navbar_hamburger { position: relative; z-index: 6; width: 40px; height: 24px; cursor: pointer; }
+  .navbar_hamburger_line { height: 2px; background: #fff; margin: 6px 0; }
+  .navbar_dim { position: fixed; inset: 0; z-index: 4; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; }
+  .navbar_dim.is-open { opacity: 1; pointer-events: auto; }
+
+  .modal { display: none; position: fixed; inset: 0; z-index: 20; }
+  .modal.is-visible { display: block; }
+  .modal-dim { position: absolute; inset: 0; background: rgba(0,0,0,.6); }
+  .modal-dialog { position: relative; z-index: 1; background: #fff; padding: 1rem; }
+
+  /* After the migration the collapse is keyed on vci-accordion-state, not on
+     .is-open added to the answer and icon by the old script. */
+  .faq_item { border-top: 1px solid #ddd; }
+  .faq_toggle { display: flex; justify-content: space-between; cursor: pointer; padding: 1rem 0; }
+  .faq_answer-text > :last-child { margin-bottom: 1rem; }
+
+  .sticky-menu { position: sticky; top: calc(var(--nav-height, 4.5rem) + 1.5rem); }
+  .sticky-menu-nav-item.is-current { font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- announcement-bar sits above the navbar in page-wrapper, so the header's
+     bottom edge moves as the page scrolls -->
+<div class="announcement-bar" style="height:40px;background:#8a1c1c;color:#fff">Announcement</div>
+
+<nav class="navbar" vci-nav="header" vci-nav-height-var="--nav-height" vci-nav-key="main">
+  <div class="padding-global">
+    <div class="navbar_container">
+      <a class="navbar_logo-link" href="/"><div class="logo-wrapper">CTK</div></a>
+
+      <div class="navbar_menu" vci-nav="menu">
+        <div class="navbar_dropdown"><a class="navbar_link" href="/about">About</a></div>
+        <div class="navbar_dropdown"><a class="navbar_link" href="#beliefs">Beliefs</a></div>
+        <a class="navbar_link" href="#" vci-modal="open" vci-modal-key="connect">Connect</a>
+      </div>
+
+      <!-- a plain div, exactly as the Designer has it -->
+      <div class="navbar_hamburger" data-mobile-toggle vci-nav="toggle">
+        <div class="navbar_hamburger_line"></div>
+        <div class="navbar_hamburger_line"></div>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="navbar_dim" vci-nav="dim" vci-nav-key="main"></div>
+
+<main>
+  <div class="sticky-menu">
+    <a class="sticky-menu-nav-item" href="#beliefs">Beliefs</a>
+  </div>
+
+  <div class="faq_item" vci-accordion="item">
+    <div class="faq_toggle" role="button" tabindex="0" aria-expanded="false" vci-accordion="trigger">
+      <div class="text-size-regular text-weight-bold">What do you sing?</div>
+      <div class="faq_icon" vci-accordion="icon">v</div>
+    </div>
+    <div class="faq_answer" vci-accordion="body">
+      <div class="faq_answer-inner">
+        <div class="faq_answer-text"><p>Psalms and hymns.</p></div>
+      </div>
+    </div>
+    <div class="horz-divider"></div>
+  </div>
+
+  <div style="height:1500px"></div>
+  <h2 id="beliefs">Beliefs</h2>
+  <div style="height:800px"></div>
+</main>
+
+<!-- the modal component, with its Modal ID bound to the domId as today -->
+<div class="modal" id="connect" vci-modal="dialog" vci-modal-key="connect">
+  <div class="padding-global">
+    <div class="modal-dialog" role="dialog" aria-modal="true">
+      <div class="modal_header">
+        <h2 vci-modal="title">Connect</h2>
+        <a class="modal_close" href="#" data-modal-close aria-label="Close" vci-modal="close">x</a>
+      </div>
+      <div class="modal_body"><p>Tell us you are here.</p></div>
+    </div>
+  </div>
+  <div class="modal-dim" aria-hidden="true" vci-modal="dim"></div>
+</div>
+
+<script src="../../dist/narthex.js"
+        vci-scroll="native"
+        vci-scroll-offset="calc(var(--nav-height, 4.5rem) + 1.5rem)"></script>
+</body>
+</html>
