@@ -9,6 +9,23 @@ Order of work: add the narthex script tag **alongside** the existing code,
 migrate one behaviour at a time (both engines tolerate each other — they key
 off different attributes), then delete the old code once every hook is moved.
 
+## Status — attributes applied 2026-09-05 through the Webflow Data API
+
+Every `vci-*` attribute below is on the elements in the Designer, unpublished.
+They are inert until narthex loads, and the old code is all still in place, so
+the site behaves exactly as it did — this is the "both engines side by side"
+state the order of work above describes.
+
+**What is left, in order:** merge and tag narthex `v0.2.0` → add the footer
+script tag (§1) → remove `faq_accordion_toggle` from applied scripts and the
+old blocks from custom code (§7). The mobile menu (§3) starts working the
+moment the script tag lands.
+
+Applied: `vci-nav` header/menu/toggle on the `navbar` component,
+`vci-accordion` item/trigger/body/icon on the `faq-item` component,
+`vci-modal` dialog/title/close/dim on the `modal` component.
+Not applied, deliberately: anything on the orphaned Home modal (§4).
+
 ## What is different about this site
 
 The North Church was built on Webflow's Navbar element. **Christ the King has
@@ -20,10 +37,9 @@ site `vci-nav="dim"` would have silently done nothing. narthex ≥ 0.2.0 adds th
 `toggle` and `menu` roles for exactly this shape: narthex owns the open class
 itself, and the hamburger gets the keyboard support a `<div>` does not have.
 
-One thing the audit could **not** establish: what opens the menu today. There is
-no handler for `data-mobile-toggle` in the site's custom code, and neither
-registered script's body is readable from here — so it is presumably a Webflow
-Interaction on the hamburger. That matters for §3, which has a decision in it.
+That gap is not theoretical here: **the mobile menu does not work on the live
+site.** The open state is fully styled in the Designer and nothing toggles it —
+see §3, which is the shortest section here and the one that fixes the most.
 
 ## 1. Load narthex
 
@@ -66,29 +82,40 @@ not part of this migration.
 | — (there is no dim today) | `vci-nav="dim"` on a new full-page div, if you want one | sibling of the navbar |
 | — | `vci-nav-key="main"` on the navbar root and the dim | pairs the three roles |
 
-What this buys, none of which the site has today: the page stops scrolling
+**The mobile menu is broken today, and this is why.** The Designer already has
+a `.navbar_menu.is-open` combo class, fully styled at the `medium` breakpoint —
+`max-height: calc(100vh - 6rem)`, `opacity: 1`, `pointer-events: auto`,
+`transform: translate(0px, 0rem)`, `overscroll-behavior: contain`. The base
+`.navbar_menu` at that breakpoint is its closed twin: `max-height: 0`,
+absolutely positioned under the header. The open state was designed and built.
+**Nothing ever toggles the class.** There is no handler for
+`data-mobile-toggle` in the site's custom code, and neither applied registered
+script is a menu toggle.
+
+So this is not really a migration — it is the missing half of something already
+built. narthex's default `vci-nav-menu-class` is `is-open`, the exact class the
+Designer is waiting for, so `vci-nav="toggle"` and `vci-nav="menu"` connect the
+two ends and the menu works. No new styles, no `vci-nav-menu-class` override.
+
+It also brings what the design never had a place for: the page stops scrolling
 behind the open menu (the lock is shared with the modal engine, so a modal
 opened over the menu does not strand it), the hamburger becomes focusable and
-announces itself as a button, `aria-expanded` tracks the state, Escape closes,
-and following a link inside the menu closes it.
+announces itself as a button — it is a `<div>`, so today it cannot be reached
+from the keyboard at all — `aria-expanded` tracks the state, Escape closes, and
+following a link inside the menu closes it.
 
-**The decision.** Two engines must not both own the open class:
-
-- **narthex owns it** — delete the Interaction, and style the open menu from
-  `.navbar_menu.is-open` in the Designer. Simplest, and the option the fixture
-  test covers.
-- **The Interaction keeps it** — set `vci-nav-own="false"` on `.navbar_menu`.
-  narthex then only watches the class and drives the dim, lock, aria and
-  events off it. This only works if the Interaction toggles a *class*; a
-  Webflow Interaction that animates inline styles instead has nothing to
-  watch, in which case take the first option.
-
-Check which the Interaction actually does before choosing. Use
-`vci-nav-menu-class` if the class it toggles is not `is-open`.
+**If an Interaction turns up.** The audit could not see Webflow Interactions
+through the Data API. If one is found later that also toggles the class, do not
+leave both: either delete it, or set `vci-nav-own="false"` on `.navbar_menu` so
+narthex only watches the class and drives the dim, lock, aria and events off
+it. The second only works if the Interaction toggles a *class* — one that
+animates inline styles has nothing to watch.
 
 ## 4. Modal + drawer engine (site footer script → `modal`)
 
-The footer IIFE is the same engine The North Church had, so the map is the same.
+The footer IIFE is the same engine The North Church had, so the map is the
+same — but see the two findings at the end of this section before doing any of
+it.
 
 | Today | narthex | Where |
 | --- | --- | --- |
@@ -105,11 +132,29 @@ The engine's drawer half — swipe-to-dismiss, `data-modal-desktop-inline` — h
 no users in the current Designer. It maps cleanly if a drawer is ever added; it
 is not migration work today.
 
-**One binding the API cannot set.** `vci-modal-key` on the `modal` component
-root has to be bound to the **Modal ID** prop, the same prop the `id` is bound
-to, and attribute *bindings* can only be made by hand in the Designer. Same
-caveat as The North Church. Page-level `.modal` shells that are not component
-instances (the one on Home) take a plain static `vci-modal-key` instead.
+**No key, and no binding.** The North Church needed `vci-modal-key` bound to
+the Modal ID prop by hand. This site does not, for two reasons:
+
+- narthex resolves a key it cannot find as an attribute by falling back to
+  `document.getElementById(key)`, and reads a host's own key from `el.id`. The
+  Modal ID prop already writes the DOM id, so `vci-modal="dialog"` on its own
+  is enough — a trigger with `vci-modal-key="connect"` finds `#connect`.
+- The binding is not possible anyway. The Modal ID prop is Webflow's `id` type,
+  and `get_bindable_sources` reports it as bindable **only** to an `id` setting
+  — not to an attribute value, in the API or by hand. (The North Church note
+  should be revisited on this point.)
+
+**Nothing on the site uses this engine yet.** All 22 pages were scanned: there
+are **no `data-modal-open` triggers anywhere**, and the `modal` component has
+**zero instances**. The only `.modal` in the site is one on Home, and it is
+leftover scaffolding — the component's default "Modal title", a close link
+still reading "Button Text", no DOM id, no `.modal-dim`, and nothing that opens
+it. It was left untouched; it wants deleting, not migrating, but that is a call
+for whoever put it there.
+
+So §4 is really forward-looking: the roles are on the component so the next
+modal someone builds works, and the ~200-line footer IIFE can be deleted
+outright rather than migrated, because it has no users.
 
 ## 5. FAQ accordion (registered script `faq_accordion_toggle` → `accordion`)
 
@@ -156,9 +201,28 @@ scripts.** It and narthex would both toggle the item.
 - **Site head custom code**: the nav-height measurer IIFE and the
   `scroll-padding-top` style. **Keep** the sticky-menu scrollspy (§6) — lift it
   into its own `<script>` when the measurer goes.
-- **Site footer custom code**: the modal/drawer IIFE. **Keep** the parallax
+- **Site footer custom code**: the modal/drawer IIFE — which currently drives
+  nothing at all (§4), so this one is a straight deletion. **Keep** the parallax
   injector and the Turnstile CSS.
 - **Applied scripts**: `faq_accordion_toggle` (§5).
+- **Dead `data-*` attributes in the Designer.** These are the old engines'
+  hooks, not narthex's — narthex reads only `vci-*` — and they are kept until
+  the code that reads them is gone, so nothing breaks mid-migration. Once §7 is
+  done they refer to nothing:
+
+  | Attribute | On | Read by |
+  | --- | --- | --- |
+  | `data-mobile-toggle` | `.navbar_hamburger` | nothing, today — it is the hook the missing menu toggle was meant to use (§3) |
+  | `data-modal-close` | `a.modal_close` in the `modal` component, and the orphan on Home | the footer modal IIFE |
+
+  Leave `data-theme-toggle` on the navbar's hidden theme link: it belongs to the
+  commented-out theme switcher, which is not part of this migration.
+
+  The state classes are a different matter and **do not** get renamed.
+  `is-open` and `is-visible` are Designer classes that narthex is configured to
+  match (`vci-nav-menu-class`, `vci-modal-class`), not names narthex imposes —
+  the whole point of them being settings. `.navbar_menu.is-open` already
+  existed and is why §3 needs no new styles.
 
 ## 8. Proving it before touching the Designer
 

@@ -86,6 +86,8 @@ console.log('modal component');
   await page.click('[vci-modal="open"][vci-modal-key="connect"]');
   await page.waitForTimeout(30);
   ok(await cls(page, '#connect', 'is-visible'), 'Connect opens the modal keyed by its Modal ID');
+  ok(await page.$eval('#connect', (e) => !e.hasAttribute('vci-modal-key')),
+    'the host carries no key attribute — it resolved by DOM id alone');
   ok(await page.evaluate(() => new URL(location.href).searchParams.get('modal') === 'connect'), '?modal=connect written');
 
   await page.click('#connect [vci-modal="close"]');

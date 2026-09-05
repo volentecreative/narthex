@@ -85,8 +85,10 @@
   <div style="height:800px"></div>
 </main>
 
-<!-- the modal component, with its Modal ID bound to the domId as today -->
-<div class="modal" id="connect" vci-modal="dialog" vci-modal-key="connect">
+<!-- The modal component. The Modal ID prop writes the domId, and narthex
+     resolves a key it cannot find as an attribute via getElementById — so there
+     is deliberately NO vci-modal-key here. -->
+<div class="modal" id="connect" vci-modal="dialog">
   <div class="padding-global">
     <div class="modal-dialog" role="dialog" aria-modal="true">
       <div class="modal_header">
