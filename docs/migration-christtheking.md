@@ -32,6 +32,20 @@ The North Church was built on Webflow's Navbar element. **Christ the King has
 no `.w-nav` anywhere.** The header is a hand-built `<nav class="navbar">`, and
 the hamburger is a plain `<div class="navbar_hamburger" data-mobile-toggle>`.
 
+This is easy to misread, because the site *does* have `w--open` on it. Webflow
+uses that class for two unrelated elements:
+
+| Webflow element | Renders | What gets `w--open` | On this site |
+| --- | --- | --- | --- |
+| **Dropdown** | `.w-dropdown` / `.w-dropdown-toggle` / `.w-dropdown-list` | the toggle and the list | **three** — the nav dropdowns, incl. the mega menu |
+| **Navbar** | `.w-nav` / `.w-nav-menu` / `.w-nav-button` | the menu button | **none** |
+
+The three nav dropdowns are genuine `DropdownWrapper` elements and Webflow's own
+JS opens them. narthex touches none of that — the nav module reads
+`.w-nav-button`, the *Navbar* class, and there is no Navbar element here
+(`NavbarWrapper`, `NavbarMenu` and `NavbarButton` all return zero matches).
+That is the whole reason the mobile menu is dead while the dropdowns work.
+
 Until now the nav module only knew how to watch a Webflow navbar, so on this
 site `vci-nav="dim"` would have silently done nothing. narthex ≥ 0.2.0 adds the
 `toggle` and `menu` roles for exactly this shape: narthex owns the open class
@@ -110,6 +124,15 @@ leave both: either delete it, or set `vci-nav-own="false"` on `.navbar_menu` so
 narthex only watches the class and drives the dim, lock, aria and events off
 it. The second only works if the Interaction toggles a *class* — one that
 animates inline styles has nothing to watch.
+
+**If the header is ever rebuilt on Webflow's Navbar element** — the most
+Webflow-native end state, and worth doing: Webflow would then run the mobile
+menu itself, exactly as it already runs the dropdowns. The migration is to
+delete `vci-nav="toggle"` and `vci-nav="menu"`, keep `vci-nav="header"`, and add
+`vci-nav="dim"` — narthex goes back to watching `w--open` on `.w-nav-button`,
+which is the path The North Church uses. Nothing else in this document changes.
+Note the Data API cannot build it: the element builder can create a `Dropdown`
+but has no Navbar type, so that is a by-hand Designer job.
 
 ## 4. Modal + drawer engine (site footer script → `modal`)
 
