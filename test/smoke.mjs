@@ -91,6 +91,37 @@ console.log('drawer');
   ok(await page.$eval('.drawer-panel', (e) => e.classList.contains('is-visible')), 'part gets class');
   ok(await page.evaluate(() => !new URL(location.href).searchParams.has('modal')), 'drawer skips URL param');
   ok(await page.$eval('[vci-modal="open"][vci-modal-key="filters"]', (e) => e.getAttribute('aria-expanded') === 'true'), 'trigger aria-expanded');
+  await page.waitForTimeout(60);
+  ok(await page.evaluate(() => document.activeElement === document.querySelector('.drawer-panel button[vci-modal="close"]')), 'focus walks past the div close to the button');
+  // the touch half of the scroll lock (iOS ignores overflow:hidden on body)
+  const touch = (sel, y) => page.evaluate(([sel, y]) => {
+    const t = document.querySelector(sel);
+    const mk = (type) => new TouchEvent(type, { bubbles: true, cancelable: true,
+      touches: [new Touch({ identifier: 1, target: t, clientX: 10, clientY: y })] });
+    t.dispatchEvent(mk('touchstart'));
+    const mv = mk('touchmove');
+    t.dispatchEvent(mv);
+    return mv.defaultPrevented;
+  }, [sel, y]);
+  ok(await touch('body', 100) === true, 'touchmove on the page behind the drawer is prevented');
+  ok(await page.evaluate(() => !vci.lock.allows(document.body) && vci.lock.allows(document.querySelector('#drawer-scroll p'))), 'lock.allows: page no, scrollable panel body yes');
+  await page.evaluate(() => { document.querySelector('#drawer-scroll').scrollTop = 20; });
+  ok(await touch('#drawer-scroll p', 100) === false, 'touchmove inside the scrollable body mid-scroll is allowed');
+  await page.evaluate(() => { document.querySelector('#drawer-scroll').scrollTop = 0; });
+  ok(await page.evaluate(() => {
+    const t = document.querySelector('#drawer-scroll p');
+    const mk = (type, y) => new TouchEvent(type, { bubbles: true, cancelable: true,
+      touches: [new Touch({ identifier: 1, target: t, clientX: 10, clientY: y })] });
+    t.dispatchEvent(mk('touchstart', 100));
+    const mv = mk('touchmove', 140); // finger down at the top = page would scroll next
+    t.dispatchEvent(mv);
+    return mv.defaultPrevented;
+  }), 'pulling down at the top of the scrollable body is prevented (would chain to the page)');
+  // close(key, false) leaves focus where it is
+  await page.evaluate(() => vci.modal.close('filters', false));
+  ok(await page.evaluate(() => document.activeElement !== document.querySelector('[vci-modal="open"][vci-modal-key="filters"]')), 'close(key, false) does not restore focus');
+  ok(await page.evaluate(() => vci.lock.allows(document.body)), 'lock released: touches allowed again');
+  await page.click('[vci-modal="open"][vci-modal-key="filters"]');
   // swipe down to dismiss
   const h = await page.$('[vci-modal="handle"]');
   const box = await h.boundingBox();
@@ -110,6 +141,25 @@ console.log('drawer');
   const { page, ctx } = await open({ viewport: { width: 1200, height: 800 } });
   await page.click('[vci-modal="open"][vci-modal-key="filters"]');
   ok(await page.$eval('.drawer', (e) => !e.classList.contains('is-visible')), 'inline media query blocks opening on desktop');
+  await ctx.close();
+}
+{
+  // a host that turns up after load (rendered or annotated by site code)
+  const { page, ctx } = await open();
+  await page.evaluate(() => {
+    const h = document.createElement('div');
+    h.className = 'drawer';
+    h.setAttribute('vci-modal', 'drawer');
+    h.setAttribute('vci-modal-key', 'late');
+    h.setAttribute('vci-modal-inline', '(min-width: 992px)');
+    h.innerHTML = '<div class="drawer-panel" vci-modal="part"><button vci-modal="close">x</button></div>';
+    document.body.appendChild(h);
+  });
+  ok(await page.evaluate(() => vci.modal.open('late')), 'late host opens by key');
+  ok(await page.evaluate(() => vci.lock.active()), 'late host holds the lock');
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.waitForTimeout(50);
+  ok(await page.evaluate(() => !vci.modal.isOpen('late') && !vci.lock.active()), 'late host closes when the viewport crosses into its inline query');
   await ctx.close();
 }
 

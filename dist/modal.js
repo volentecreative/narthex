@@ -1,4 +1,4 @@
-/*! narthex v0.2.0 — modal — https://github.com/volentecreative/narthex
+/*! narthex v0.3.0 — modal — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.2.0';
+  vci.version = '0.3.0';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -119,6 +119,18 @@
   /* ---------- scroll lock (shared by modal + nav) ---------- */
   // Several things can want the page locked at once (a drawer over an open
   // nav). Each holds by id; the body unlocks when the last one lets go.
+  //
+  // overflow:hidden on <body> is the lock on every browser but iOS Safari,
+  // which ignores it: a finger on an open sheet still pans the page behind
+  // it, and overscroll-behavior is not reliably honoured either, so a panel
+  // whose body has nothing to scroll chains every touch straight through to
+  // the page. So each hold names the element a finger MAY scroll inside
+  // (the dialog, the drawer, the menu), and while any hold is active a
+  // touchmove is allowed only over something inside one of those regions
+  // that genuinely overflows, and not past its edges (top pulling down and
+  // bottom pushing up are what chain to the page). Everything else is
+  // prevented. Non-passive by necessity: a passive listener's
+  // preventDefault is a no-op.
   var holds = {};
   function applyLock() {
     var active = Object.keys(holds).length > 0;
@@ -134,11 +146,52 @@
       b.style.paddingRight = '';
     }
   }
+  function regionOf(node) {
+    var ids = Object.keys(holds);
+    for (var i = 0; i < ids.length; i++) {
+      var r = holds[ids[i]];
+      if (r && r.nodeType === 1 && r.contains(node)) return r;
+    }
+    return null;
+  }
+  function scrollableWithin(node, region) {
+    for (var el = node; el; el = el.parentNode) {
+      if (el.nodeType === 1 && el.scrollHeight > el.clientHeight + 1) {
+        var oy = getComputedStyle(el).overflowY;
+        if (oy === 'auto' || oy === 'scroll') return el;
+      }
+      if (el === region) return null;
+    }
+    return null;
+  }
+  var touchY = null;
+  d.addEventListener('touchstart', function (e) {
+    touchY = (vci.lock.active() && e.touches && e.touches.length === 1) ? e.touches[0].clientY : null;
+  }, { passive: true });
+  d.addEventListener('touchmove', function (e) {
+    if (!vci.lock.active()) return;
+    var region = regionOf(e.target);
+    if (!region) { e.preventDefault(); return; }
+    var sc = scrollableWithin(e.target, region);
+    if (!sc) { e.preventDefault(); return; }
+    if (!e.touches || e.touches.length !== 1 || touchY === null) return;
+    var y = e.touches[0].clientY;
+    var dy = y - touchY; // finger moving down = content scrolling up
+    touchY = y;
+    var atTop = sc.scrollTop <= 0;
+    var atBottom = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
+    if ((dy > 0 && atTop) || (dy < 0 && atBottom)) e.preventDefault();
+  }, { passive: false });
   vci.lock = {
-    hold: function (id) { holds[id] = true; applyLock(); },
+    // hold(id, region): region is the element a touch may scroll inside
+    // while this hold is active. Omit it and nothing scrolls by touch.
+    hold: function (id, region) { holds[id] = region || true; applyLock(); },
     release: function (id) { delete holds[id]; applyLock(); },
     active: function () { return Object.keys(holds).length > 0; },
-    ids: function () { return Object.keys(holds); }
+    ids: function () { return Object.keys(holds); },
+    // Would this touch be allowed to scroll? Exposed for tests and for site
+    // code that wants to reason about the lock without dispatching touches.
+    allows: function (node) { return !vci.lock.active() || !!(regionOf(node) && scrollableWithin(node, regionOf(node))); }
   };
 
   /* ---------- focus helpers ---------- */
@@ -201,7 +254,16 @@
  * Something else may toggle the open class — a Webflow interaction, site code,
  * a script that owned the dialog before narthex did. Every host's class is
  * watched, so the scroll lock, aria and events stay truthful either way.
- * API     vci.modal.open(key, triggerEl?) · close(keyOrEl?) · closeAll() · isOpen(key) · resolve(key)
+ * API     vci.modal.open(key, triggerEl?) · close(keyOrEl?, restore?) · closeAll(restore?)
+ *         · isOpen(key) · resolve(key)
+ *         restore=false leaves focus where it is on close, for a caller that
+ *         restores it itself.
+ *
+ * The open class can be set on hosts that did not exist at load (rendered
+ * later, or annotated by site code): open() resolves live, and the URL param,
+ * inline media query and class observer are armed the first time a host is
+ * touched. While a host is open the shared scroll lock names it as the one
+ * region a finger may scroll inside — see the lock in core.
  */
 vci.define('modal', function (vci) {
   'use strict';
@@ -260,11 +322,28 @@ vci.define('modal', function (vci) {
     history.replaceState(history.state, '', u);
   }
 
-  function focusInto(el) {
-    var c = vci.all(M, 'close', el)[0];
-    if (c && c.matches(vci.FOCUSABLE)) { c.focus(); return; }
+  // The first close affordance is often a scrim or a div (not focusable), so
+  // walk for one that takes focus before falling back to the host itself.
+  function focusTarget(el) {
+    var closes = vci.all(M, 'close', el);
+    for (var i = 0; i < closes.length; i++) {
+      if (closes[i].matches(vci.FOCUSABLE)) return closes[i];
+    }
     if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
-    el.focus({ preventScroll: true });
+    return el;
+  }
+  // Focus now, and again two frames later if it did not take: a host whose
+  // visibility is mid-transition from hidden refuses focus silently, and by
+  // the second frame the transition has progressed enough to compute visible.
+  function focusInto(el) {
+    var t = focusTarget(el);
+    try { t.focus({ preventScroll: true }); } catch (x) { t.focus(); }
+    if (!w.requestAnimationFrame) return;
+    requestAnimationFrame(function () { requestAnimationFrame(function () {
+      if (!el.classList.contains(openClass(el)) || el.contains(d.activeElement)) return;
+      var t2 = focusTarget(el);
+      try { t2.focus({ preventScroll: true }); } catch (x) { t2.focus(); }
+    }); });
   }
   // A CMS card's trigger is often the Collection Item (a div) because the card
   // is a component and attributes cannot bind inside a component definition.
@@ -291,7 +370,7 @@ vci.define('modal', function (vci) {
     state.set(el, true);
     if (!el.hasAttribute('role')) el.setAttribute('role', 'dialog');
     el.setAttribute('aria-modal', 'true');
-    vci.lock.hold(M + ':' + k);
+    vci.lock.hold(M + ':' + k, el);
     triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'true'); });
     if (trig && trig.setAttribute) trig.setAttribute('aria-expanded', 'true');
     if (usesUrl(el)) setParam(el, k);
@@ -305,7 +384,21 @@ vci.define('modal', function (vci) {
     if (usesUrl(el)) clearParam(el);
     vci.emit(el, 'modal:close', { key: k, host: el });
   }
+  // The inline media query closes the host when the viewport crosses into
+  // it (its content is ordinary page content there). Armed once per host,
+  // whether the host was on the page at load or turned up later.
+  var armed = new WeakMap();
+  function armInline(el) {
+    if (armed.has(el)) return;
+    armed.set(el, true);
+    var mq = inlineMq(el);
+    if (!mq) return;
+    var onChange = function (ev) { if (ev.matches) hide(el, false); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  }
   function watch(el) {
+    armInline(el);
     if (state.has(el)) return;
     state.set(el, el.classList.contains(openClass(el)));
     new MutationObserver(function () {
@@ -482,8 +575,6 @@ vci.define('modal', function (vci) {
         t.setAttribute('aria-expanded', 'false');
         if (!t.hasAttribute('aria-haspopup')) t.setAttribute('aria-haspopup', 'dialog');
       });
-      var mq = inlineMq(el);
-      if (mq) mq.addEventListener('change', function (ev) { if (ev.matches) hide(el, false); });
       // Something already open on load (a Designer state left on, or a class
       // set server-side) still needs the lock and aria.
       if (el.classList.contains(openClass(el))) { state.set(el, false); applyOpen(el, k, null); }
@@ -500,8 +591,11 @@ vci.define('modal', function (vci) {
 
   return {
     open: show,
-    close: function (k) { return k == null ? (closeAll(true), true) : hide(k, true); },
-    closeAll: function () { closeAll(true); },
+    close: function (k, restore) {
+      restore = restore !== false;
+      return k == null ? (closeAll(restore), true) : hide(k, restore);
+    },
+    closeAll: function (restore) { closeAll(restore !== false); },
     isOpen: function (k) { var el = resolve(k); return !!el && el.classList.contains(openClass(el)); },
     resolve: resolve,
     openHosts: openEls
