@@ -40,6 +40,7 @@
   .drawer-panel { position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 12px 12px 0 0; transform: translateY(100%); transition: transform .25s ease; padding: 0 1rem 1rem; }
   .drawer-panel.is-visible { transform: translateY(0); }
   .drawer-handle { padding: .75rem 0; text-align: center; cursor: grab; }
+  .drawer-body { max-height: 80px; overflow: auto; border: 1px solid #eee; }
   .drawer-handle::before { content: ""; display: block; width: 36px; height: 4px; border-radius: 2px; background: #ccc; margin: 0 auto .5rem; }
   @media (min-width: 992px) {
     .drawer { position: static; pointer-events: auto; }
@@ -89,8 +90,14 @@
       <div class="drawer-scrim" vci-modal="scrim"></div>
       <div class="drawer-panel" vci-modal="part">
         <div class="drawer-handle" vci-modal="handle">Filters</div>
+        <!-- a div close ahead of the button: focus must walk past it -->
+        <div class="drawer-x" vci-modal="close" aria-hidden="true"></div>
         <button type="button" vci-modal="close">Close</button>
         <p>Drawer body. On desktop (≥992px) this is inline content.</p>
+        <div class="drawer-body" id="drawer-scroll">
+          <p>Scrollable drawer body — the one place a finger may scroll while the drawer is open.</p>
+          <p>Line 2</p><p>Line 3</p><p>Line 4</p><p>Line 5</p><p>Line 6</p><p>Line 7</p><p>Line 8</p>
+        </div>
       </div>
     </div>
   </section>

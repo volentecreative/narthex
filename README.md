@@ -125,7 +125,11 @@ every role with just enough CSS to see it move.
 
 narthex changes **state**: classes, `aria-*`, `inert`, a few CSS variables, and
 the small amount of CSS that state needs to mean anything (the accordion's
-grid-rows collapse; the scroll module's `:target` margin). It never sets
+grid-rows collapse; the scroll module's `:target` margin). The scroll lock the
+modal and nav modules share is `overflow: hidden` on `<body>` plus a touch
+guard for iOS, which ignores that property: while anything is open, a finger
+may scroll only inside the open element, over something that genuinely
+overflows, and not past its edges. It never sets
 colours, sizes, or layout — those are Webflow classes on your elements, and the
 open-state class name (`is-visible`, `is-open`) is a setting, so it fits
 whatever the site already uses.

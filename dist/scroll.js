@@ -1,4 +1,4 @@
-/*! narthex v0.2.0 — scroll — https://github.com/volentecreative/narthex
+/*! narthex v0.3.0 — scroll — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.2.0';
+  vci.version = '0.3.0';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -119,6 +119,18 @@
   /* ---------- scroll lock (shared by modal + nav) ---------- */
   // Several things can want the page locked at once (a drawer over an open
   // nav). Each holds by id; the body unlocks when the last one lets go.
+  //
+  // overflow:hidden on <body> is the lock on every browser but iOS Safari,
+  // which ignores it: a finger on an open sheet still pans the page behind
+  // it, and overscroll-behavior is not reliably honoured either, so a panel
+  // whose body has nothing to scroll chains every touch straight through to
+  // the page. So each hold names the element a finger MAY scroll inside
+  // (the dialog, the drawer, the menu), and while any hold is active a
+  // touchmove is allowed only over something inside one of those regions
+  // that genuinely overflows, and not past its edges (top pulling down and
+  // bottom pushing up are what chain to the page). Everything else is
+  // prevented. Non-passive by necessity: a passive listener's
+  // preventDefault is a no-op.
   var holds = {};
   function applyLock() {
     var active = Object.keys(holds).length > 0;
@@ -134,11 +146,52 @@
       b.style.paddingRight = '';
     }
   }
+  function regionOf(node) {
+    var ids = Object.keys(holds);
+    for (var i = 0; i < ids.length; i++) {
+      var r = holds[ids[i]];
+      if (r && r.nodeType === 1 && r.contains(node)) return r;
+    }
+    return null;
+  }
+  function scrollableWithin(node, region) {
+    for (var el = node; el; el = el.parentNode) {
+      if (el.nodeType === 1 && el.scrollHeight > el.clientHeight + 1) {
+        var oy = getComputedStyle(el).overflowY;
+        if (oy === 'auto' || oy === 'scroll') return el;
+      }
+      if (el === region) return null;
+    }
+    return null;
+  }
+  var touchY = null;
+  d.addEventListener('touchstart', function (e) {
+    touchY = (vci.lock.active() && e.touches && e.touches.length === 1) ? e.touches[0].clientY : null;
+  }, { passive: true });
+  d.addEventListener('touchmove', function (e) {
+    if (!vci.lock.active()) return;
+    var region = regionOf(e.target);
+    if (!region) { e.preventDefault(); return; }
+    var sc = scrollableWithin(e.target, region);
+    if (!sc) { e.preventDefault(); return; }
+    if (!e.touches || e.touches.length !== 1 || touchY === null) return;
+    var y = e.touches[0].clientY;
+    var dy = y - touchY; // finger moving down = content scrolling up
+    touchY = y;
+    var atTop = sc.scrollTop <= 0;
+    var atBottom = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
+    if ((dy > 0 && atTop) || (dy < 0 && atBottom)) e.preventDefault();
+  }, { passive: false });
   vci.lock = {
-    hold: function (id) { holds[id] = true; applyLock(); },
+    // hold(id, region): region is the element a touch may scroll inside
+    // while this hold is active. Omit it and nothing scrolls by touch.
+    hold: function (id, region) { holds[id] = region || true; applyLock(); },
     release: function (id) { delete holds[id]; applyLock(); },
     active: function () { return Object.keys(holds).length > 0; },
-    ids: function () { return Object.keys(holds); }
+    ids: function () { return Object.keys(holds); },
+    // Would this touch be allowed to scroll? Exposed for tests and for site
+    // code that wants to reason about the lock without dispatching touches.
+    allows: function (node) { return !vci.lock.active() || !!(regionOf(node) && scrollableWithin(node, regionOf(node))); }
   };
 
   /* ---------- focus helpers ---------- */

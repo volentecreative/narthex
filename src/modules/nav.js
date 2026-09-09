@@ -120,7 +120,7 @@ vci.define('nav', function (vci) {
       t.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
     if (vci.bool(vci.config(M, 'lock', 'true', entry.nav), true)) {
-      if (open) vci.lock.hold('nav:' + tracked.indexOf(entry));
+      if (open) vci.lock.hold('nav:' + tracked.indexOf(entry), entry.menu);
       else vci.lock.release('nav:' + tracked.indexOf(entry));
     }
     if (open === entry.open) return;
