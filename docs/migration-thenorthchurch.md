@@ -11,17 +11,39 @@ off different attributes), then delete the old code once every hook is moved.
 
 ## Status — applied 2026-09-04 through the Webflow Data API
 
-Everything below is in the Designer (unpublished) except two attribute
+Everything below is in the Designer (unpublished) except the attribute
 **bindings**, which the API rejects and which have to be set by hand before
-the site is published:
+the site is published. The API refuses them two different ways, both worth
+knowing: a CMS `value_binding` on an attribute comes back *"value must be a
+string or a binding"*, and `set_dom_id` with the same binding comes back
+*"Element is not inside a CMS context"* — because addressing an element
+through `scope_component_id` loses the Collection List wrapped around it,
+even when that Collection List is inside the same component.
 
 1. **`button` component** → root Link: add attribute `vci-modal-key` bound to
    the **Open Modal** prop (the same prop `data-modal-open` is bound to).
    Without it a button whose Open Modal is set does nothing.
 2. **`/about/leadership`** → each of the five `people-grid_item` Collection
    Items: add attribute `vci-modal-key` bound to the Team Member **Slug**
-   (the same field `data-modal-open` is bound to). The member modal on the
-   other side already resolves by its slug-bound id.
+   (the same field `data-modal-open` is bound to). **Done** — verified
+   2026-09-10, bound to Slug
+   (`8588d8c71a7e8885ddea186382f436eb`).
+3. **`modal-staff` component** → the `.modal` host inside the Collection Item:
+   add `vci-modal-key` bound to the Team Member **Slug**, or set the element's
+   **ID** to that same field. This is the half that is still missing, and it
+   is the whole ball game: audited 2026-09-10, the host carries `vci-modal`
+   and nothing else — no key attribute (bound or static) and no DOM id — so
+   `resolve()` finds no host, `show()` returns false, and clicking a person
+   card does nothing at all.
+
+An earlier revision of this file claimed the member modal "already resolves
+by its slug-bound id". It does not, and never did. Two things make that easy
+to believe and hard to check: the element tree omits *bound* attributes
+entirely (the trigger's own `vci-modal-key` is invisible there and only shows
+up under `get_attributes`, as a `null` value), and this host is inside a
+component definition, where bindings are hidden the same way. Use
+`get_attributes` on the host — a bound key lists its name with a `null`
+value, so a genuinely absent key is the one that lists nothing.
 
 Then merge + tag narthex `v0.1.1` (the footer points at it) and publish.
 The search modal was left with its own handler (`data-modal-open="search"` on
@@ -41,7 +63,7 @@ Site settings → Custom code → **Footer**, above the existing `<script>` bloc
 
 | Today | narthex | Where it lives |
 | --- | --- | --- |
-| `.modal` shell resolved by form id / `wf-form-<key>` / dialog id | `vci-modal="dialog"` + `vci-modal-key="<key>"` on the `.modal` element | components `modal-connect`, `modal-north-update`, `modal-search`; the team-member `.modal` on `/about/leadership` |
+| `.modal` shell resolved by form id / `wf-form-<key>` / dialog id | `vci-modal="dialog"` + `vci-modal-key="<key>"` on the `.modal` element | components `modal-connect`, `modal-north-update`, `modal-search`. The team-member `.modal` (component `modal-staff`) is a **drawer**, not a dialog — see below |
 | `data-modal="<key>"` (drawer host) | `vci-modal="drawer"` + `vci-modal-key="<key>"` | component `drawer` (root `.drawer`) |
 | `data-modal-desktop-inline` | `vci-modal-inline="(min-width: 992px)"` | same element |
 | `data-modal-open="<key>"` | `vci-modal="open"` + `vci-modal-key="<key>"` | navbar links (`connect`, `north-update`, `global-search` ×2), CMS cards, drawer buttons |
@@ -73,6 +95,56 @@ document.addEventListener('vci:modal:open',  function (e) { if (e.detail.key ===
 
 narthex ≥ 0.1.1 watches the open class, so the handler's own `closeModal()`
 would not strand the scroll lock.
+
+### The team-member modal is a drawer everywhere (2026-09-10)
+
+"Modal on desktop, drawer on mobile" has no attribute for it: `vci-modal` is a
+single role, not a responsive one, and `vci-modal-inline` does the opposite job
+(it makes a host behave as ordinary page content while its query matches). So
+`modal-staff` is `vci-modal="drawer"` at every width and *looks* like a centred
+dialog on desktop, which costs nothing because the two roles only differ in
+three ways and each one lands the right side up:
+
+- **swipe-to-dismiss** is already gated on `swipe-media`, default
+  `(max-width: 991px)` — off on desktop without asking;
+- **`aria-expanded` on the triggers** is a straight gain on the person cards;
+- **the `?modal=` URL param**, which drawers drop, is restored with
+  `vci-modal-url="true"` on the host so a link to one person's bio keeps
+  working.
+
+The roles, on `modal-staff`: `drawer` on the `.modal` host, `part` on
+`.modal-dialog.is-team` (first part = the panel that swipes), `scrim` on
+`.modal-dim` (was `dim`, so the backdrop now fades as the panel is dragged),
+and a new `.drawer_grab` > `.drawer_grab-bar` prepended to the panel carrying
+`vci-modal="handle"`. **Swipe needs that handle** — `pointerdown` bails unless
+the press starts inside one — so a drawer without it is only a bottom sheet.
+Reusing the existing `drawer_grab*` classes means it is `display: none` at base
+and only appears at `medium`, no new CSS.
+
+Presentation is Designer-side and lives entirely at the `medium` breakpoint
+(≤991px), matching both `swipe-media` and the existing `.drawer`; desktop is
+untouched. On `.modal-dialog.is-team`: `margin-top: auto` bottom-anchors the
+panel inside `.padding_global` (that wrapper is `flex-direction: column` and
+centres its child, so bottom-aligning belongs here, not on `.modal` — which is
+shared by every modal on the site and must not be restyled). Full bleed is
+`align-self: stretch` + `width: auto` + negative side margins from the site's
+own `--_spacing---negative-gutter` token: the negative-margin trick needs a
+*stretched* item, and `.modal-dialog`'s base `width: 100%` would defeat it.
+Then `max-width: none`, `max-height: 85vh`, `overflow-y: auto` with
+`overscroll-behavior: contain`, `padding-top: 0` (the grab strip and the
+panel's own 1rem gap supply the top spacing) and 1.25rem top corner radii.
+
+Two things deliberately not done. There is **no slide-up transition**: `.modal`
+toggles `display: none` → `flex`, and a transform cannot animate off that in
+the same frame, so a CSS transition would be dead code. Giving it one means
+converting `.modal` to opacity/visibility the way `.drawer` already is — a
+change to every modal on the site, not this one. Swipe is unaffected either
+way; narthex drives the drag with inline styles. And `.is-modal-flush`
+(a `padding_global` helper that already zeroes the side padding at `medium`)
+was **not** used, despite being exactly right, because `set_style` cannot
+resolve site classes for an element addressed through `scope_component_id`
+— it answers "One or more styles not found" for classes that plainly exist.
+Hence the negative-margin route, which needs no new class on the wrapper.
 
 ## 3. Accordion (site footer script + `rich-text-accordion.html` → `accordion`)
 
