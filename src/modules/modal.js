@@ -38,8 +38,8 @@
  *   enter-duration  length of that animation. Default 300ms.
  *   exit       how it leaves. "match" (default) mirrors enter, or name one of
  *              the same values, or "none" to snap away.
- *   exit-duration   length of the exit. Default 250ms — a little quicker than
- *              the entrance, which is how a leaving thing should feel.
+ *   exit-duration   length of the exit. Defaults to enter-duration, so a modal
+ *              leaves on the same timing it arrived on.
  *
  * EVENTS  vci:modal:open / vci:modal:close on the host, detail { key, host, trigger }.
  *
@@ -227,7 +227,10 @@ vci.define('modal', function (vci) {
   }
   function exitMs(el) {
     if (exitOf(el) === 'none' || reduced()) return 0;
-    return toMs(vci.config(M, 'exit-duration', '250ms', el), 250);
+    // Falls through to the entrance's length, matching the CSS var chain above.
+    var v = vci.config(M, 'exit-duration', '', el) ||
+            vci.config(M, 'enter-duration', '300ms', el);
+    return toMs(v, 300);
   }
   var cssDone = false;
   function injectEnterCss() {
@@ -272,14 +275,15 @@ vci.define('modal', function (vci) {
       '@keyframes vci-modal-rise-out{to{opacity:0;transform:translateY(.75rem)}}' +
       '@keyframes vci-modal-sheet-out{to{transform:translateY(100%)}}' +
       CL + '{pointer-events:none}' +
-      everyExit + '{animation-duration:var(--vci-modal-exit,250ms);' +
-        'animation-timing-function:cubic-bezier(.4,0,1,1);animation-fill-mode:forwards}' +
+      everyExit + '{animation-duration:var(--vci-modal-exit,var(--vci-modal-enter,300ms));' +
+        'animation-timing-function:cubic-bezier(.2,.8,.2,1);animation-fill-mode:forwards}' +
       exitBacks.join(',') + '{animation-name:vci-modal-fade-out;animation-timing-function:ease}' +
       exitSel('fade') + ' ' + part + '{animation-name:vci-modal-fade-out}' +
       exitSel('rise') + ' ' + part + '{animation-name:vci-modal-rise-out}' +
       exitSel('sheet') + ' ' + part + '{animation-name:vci-modal-rise-out}' +
       '@media ' + mq + '{' + exitSel('sheet') + ' ' + part +
-        '{animation-name:vci-modal-sheet-out}}' +
+        '{animation-name:vci-modal-sheet-out;' +
+        'animation-timing-function:cubic-bezier(.2,.9,.25,1)}}' +
       '@media (prefers-reduced-motion:reduce){' + every + ',' + everyExit + '{animation:none}}');
   }
   var enterArmed = new WeakMap();
