@@ -89,6 +89,9 @@ console.log('drawer');
   await page.click('[vci-modal="open"][vci-modal-key="filters"]');
   ok(await page.$eval('.drawer', (e) => e.classList.contains('is-visible')), 'drawer opens');
   ok(await page.$eval('.drawer-panel', (e) => e.classList.contains('is-visible')), 'part gets class');
+  ok(await page.$eval('.drawer', (e) => e.getAttribute('vci-modal-state') === 'open'), 'host carries vci-modal-state="open"');
+  ok(await page.evaluate(() => !!document.querySelector('style[vci-style="modal-enter"]')), 'entrance stylesheet injected');
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'vci-modal-sheet'), 'enter="sheet" slides the panel up below the swipe breakpoint');
   ok(await page.evaluate(() => !new URL(location.href).searchParams.has('modal')), 'drawer skips URL param');
   ok(await page.$eval('[vci-modal="open"][vci-modal-key="filters"]', (e) => e.getAttribute('aria-expanded') === 'true'), 'trigger aria-expanded');
   await page.waitForTimeout(60);
@@ -120,9 +123,14 @@ console.log('drawer');
   // close(key, false) leaves focus where it is
   await page.evaluate(() => vci.modal.close('filters', false));
   ok(await page.evaluate(() => document.activeElement !== document.querySelector('[vci-modal="open"][vci-modal-key="filters"]')), 'close(key, false) does not restore focus');
+  ok(await page.$eval('.drawer', (e) => !e.hasAttribute('vci-modal-state')), 'state attribute cleared on close');
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'none'), 'entrance is scoped to the open state, so it runs again next open');
   ok(await page.evaluate(() => vci.lock.allows(document.body)), 'lock released: touches allowed again');
   await page.click('[vci-modal="open"][vci-modal-key="filters"]');
-  // swipe down to dismiss
+  // swipe down to dismiss. Let the entrance animation land first: measuring the
+  // handle while the panel is still sliding gives a box it has already left, and
+  // the press lands on the scrim instead.
+  await page.$eval('.drawer-panel', (e) => Promise.all(e.getAnimations().map((a) => a.finished)));
   const h = await page.$('[vci-modal="handle"]');
   const box = await h.boundingBox();
   await page.mouse.move(box.x + 50, box.y + 10);
@@ -160,6 +168,19 @@ console.log('drawer');
   await page.setViewportSize({ width: 1200, height: 800 });
   await page.waitForTimeout(50);
   ok(await page.evaluate(() => !vci.modal.isOpen('late') && !vci.lock.active()), 'late host closes when the viewport crosses into its inline query');
+  await ctx.close();
+}
+
+{
+  const { page, ctx } = await open({ reducedMotion: 'reduce' });
+  await page.click('[vci-modal="open"][vci-modal-key="filters"]');
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'none'), 'reduced motion: entrance animation is dropped');
+  await ctx.close();
+}
+{
+  const { page, ctx } = await open();
+  await page.click('[vci-modal="open"][vci-modal-key="connect"]');
+  ok(await page.$eval('[vci-modal="dialog"][vci-modal-key="connect"] [vci-modal="dim"]', (e) => getComputedStyle(e).animationName === 'none'), 'a host that never asks for an entrance is left alone');
   await ctx.close();
 }
 
