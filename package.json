@@ -1,6 +1,6 @@
 {
   "name": "narthex",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Attribute-driven JavaScript utilities for Webflow sites, served from jsDelivr.",
   "homepage": "https://github.com/volentecreative/narthex",
   "repository": {

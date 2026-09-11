@@ -1,4 +1,4 @@
-/*! narthex v0.3.0 — all modules — https://github.com/volentecreative/narthex
+/*! narthex v0.4.0 — all modules — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.3.0';
+  vci.version = '0.4.0';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -248,12 +248,22 @@
  *   swipe      "false" to disable drag-to-dismiss on a drawer.
  *   swipe-media media query in which swipe is active. Default (max-width: 991px).
  *   backdrop   "false" so clicking the host element itself does not close it.
+ *   enter      entrance animation for the host's parts, and a fade for its
+ *              dim/scrim: "sheet" (up from the bottom where the drawer is a
+ *              bottom sheet, a small rise above it), "rise", "fade", or "none".
+ *              Default none, so a host that already animates itself is left
+ *              alone. Needs at least one vci-modal="part" to animate.
+ *   enter-duration  length of that animation. Default 300ms.
  *
  * EVENTS  vci:modal:open / vci:modal:close on the host, detail { key, host, trigger }.
  *
  * Something else may toggle the open class — a Webflow interaction, site code,
  * a script that owned the dialog before narthex did. Every host's class is
  * watched, so the scroll lock, aria and events stay truthful either way.
+ *
+ * An open host also carries vci-modal-state="open". The open class is the
+ * site's to name (vci-modal-class), so anything this module styles keys off
+ * that attribute instead, and site CSS can use it the same way.
  * API     vci.modal.open(key, triggerEl?) · close(keyOrEl?, restore?) · closeAll(restore?)
  *         · isOpen(key) · resolve(key)
  *         restore=false leaves focus where it is on close, for a caller that
@@ -271,6 +281,8 @@ vci.define('modal', function (vci) {
   var M = 'modal';
   var RATIO = 0.25, VEL = 0.6, THRESH = 6, HIDE_MS = 300;
   var CTRL = 'button, a, input, select, textarea, label, [role="button"]';
+  var A = vci.attrName;
+  var ST = '[' + A('modal-state') + '="open"]';
   var lastTrigger = null;
   var drag = null;
 
@@ -370,6 +382,7 @@ vci.define('modal', function (vci) {
     state.set(el, true);
     if (!el.hasAttribute('role')) el.setAttribute('role', 'dialog');
     el.setAttribute('aria-modal', 'true');
+    el.setAttribute(A('modal-state'), 'open');
     vci.lock.hold(M + ':' + k, el);
     triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'true'); });
     if (trig && trig.setAttribute) trig.setAttribute('aria-expanded', 'true');
@@ -379,11 +392,75 @@ vci.define('modal', function (vci) {
   function applyClose(el, k) {
     state.set(el, false);
     el.removeAttribute('aria-modal');
+    el.removeAttribute(A('modal-state'));
     vci.lock.release(M + ':' + k);
     triggersFor(el).forEach(function (t) { t.setAttribute('aria-expanded', 'false'); });
     if (usesUrl(el)) clearParam(el);
     vci.emit(el, 'modal:close', { key: k, host: el });
   }
+  /* ---------- entrance animation ---------- */
+  // Off unless a host asks for it, so a site that already animates its own
+  // panel off the open class keeps doing exactly that.
+  //
+  // This is an animation and not a transition on purpose. A host that shows
+  // itself by flipping display:none to flex has nothing to transition *from* —
+  // the panel is laid out for the first time already in its open state, and a
+  // transition on that first frame is dead code. An animation just runs when
+  // the element is first rendered, which is the same moment. It also carries
+  // no fill-mode, so the instant it finishes the panel is back under its own
+  // styles and a drawer's drag, which writes inline transforms, is untouched.
+  var ENTER = { sheet: 1, rise: 1, fade: 1 };
+  function enterOf(el) {
+    var v = vci.config(M, 'enter', 'none', el);
+    return ENTER[v] ? v : 'none';
+  }
+  function enterSel(v) { return '[' + A('modal-enter') + '="' + v + '"]' + ST; }
+  var cssDone = false;
+  function injectEnterCss() {
+    if (cssDone) return;
+    cssDone = true;
+    // One stylesheet for every host, so the breakpoint that decides where a
+    // sheet slides rather than rises is read once, globally — a per-host
+    // swipe-media still moves that host's swipe, but not this.
+    var mq = vci.config(M, 'swipe-media', '(max-width: 991px)', d.documentElement);
+    var part = vci.sel(M, 'part'), panels = [], backs = [];
+    for (var v in ENTER) {
+      panels.push(enterSel(v) + ' ' + part);
+      backs.push(enterSel(v) + ' ' + vci.sel(M, 'dim'), enterSel(v) + ' ' + vci.sel(M, 'scrim'));
+    }
+    var every = panels.concat(backs).join(',');
+    vci.css('modal-enter',
+      '@keyframes vci-modal-fade{from{opacity:0}}' +
+      '@keyframes vci-modal-rise{from{opacity:0;transform:translateY(.75rem)}}' +
+      '@keyframes vci-modal-sheet{from{transform:translateY(100%)}}' +
+      every + '{animation-duration:var(--vci-modal-enter,300ms);' +
+        'animation-timing-function:cubic-bezier(.2,.8,.2,1)}' +
+      backs.join(',') + '{animation-name:vci-modal-fade;animation-timing-function:ease}' +
+      enterSel('fade') + ' ' + part + '{animation-name:vci-modal-fade}' +
+      enterSel('rise') + ' ' + part + '{animation-name:vci-modal-rise}' +
+      // A sheet is only a sheet where it sits on the bottom edge; above that
+      // breakpoint the same host is a centred dialog, and sliding it up from
+      // off-screen would read as a mistake.
+      enterSel('sheet') + ' ' + part + '{animation-name:vci-modal-rise}' +
+      '@media ' + mq + '{' + enterSel('sheet') + ' ' + part +
+        '{animation-name:vci-modal-sheet;animation-timing-function:cubic-bezier(.2,.9,.25,1)}}' +
+      '@media (prefers-reduced-motion:reduce){' + every + '{animation:none}}');
+  }
+  var enterArmed = new WeakMap();
+  function armEnter(el) {
+    if (enterArmed.has(el)) return;
+    enterArmed.set(el, true);
+    var en = enterOf(el);
+    if (en === 'none') return;
+    injectEnterCss();
+    // Settings resolve through ancestors, vci.settings and the script tag, but
+    // the CSS has to match on the host, so write the resolved value back onto
+    // it. Same value it already had when it was set there directly.
+    el.setAttribute(A('modal-enter'), en);
+    var dur = vci.config(M, 'enter-duration', '', el);
+    if (dur) el.style.setProperty('--vci-modal-enter', dur);
+  }
+
   // The inline media query closes the host when the viewport crosses into
   // it (its content is ordinary page content there). Armed once per host,
   // whether the host was on the page at load or turned up later.
@@ -399,6 +476,7 @@ vci.define('modal', function (vci) {
   }
   function watch(el) {
     armInline(el);
+    armEnter(el);
     if (state.has(el)) return;
     state.set(el, el.classList.contains(openClass(el)));
     new MutationObserver(function () {
@@ -517,8 +595,14 @@ vci.define('modal', function (vci) {
       drag.on = true;
       drag.startY = e.clientY;
       if (drag.handle.setPointerCapture) drag.handle.setPointerCapture(drag.id);
+      // A grab during the entrance animation takes the panel off it. While an
+      // animation runs it outranks inline styles, so the drag below would move
+      // nothing — and the scrim's opacity would be read mid-fade, making the
+      // backdrop jump when the drag hands it back.
+      drag.panel.style.animation = 'none';
       drag.panel.style.transition = 'none';
       if (drag.scrim) {
+        drag.scrim.style.animation = 'none';
         var o = parseFloat(getComputedStyle(drag.scrim).opacity);
         if (!isNaN(o) && o > 0) drag.base = o;
         drag.scrim.style.transition = 'none';
@@ -545,7 +629,11 @@ vci.define('modal', function (vci) {
     var kill = dg.dy > dg.h * RATIO || dg.vel > VEL, done = false;
     function clean() {
       dg.panel.style.transition = ''; dg.panel.style.transform = '';
-      if (dg.scrim) { dg.scrim.style.transition = ''; dg.scrim.style.opacity = ''; }
+      dg.panel.style.animation = '';
+      if (dg.scrim) {
+        dg.scrim.style.transition = ''; dg.scrim.style.opacity = '';
+        dg.scrim.style.animation = '';
+      }
     }
     function fin() {
       if (done) return; done = true;
