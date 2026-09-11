@@ -123,8 +123,12 @@ console.log('drawer');
   // close(key, false) leaves focus where it is
   await page.evaluate(() => vci.modal.close('filters', false));
   ok(await page.evaluate(() => document.activeElement !== document.querySelector('[vci-modal="open"][vci-modal-key="filters"]')), 'close(key, false) does not restore focus');
-  ok(await page.$eval('.drawer', (e) => !e.hasAttribute('vci-modal-state')), 'state attribute cleared on close');
-  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'none'), 'entrance is scoped to the open state, so it runs again next open');
+  ok(await page.$eval('.drawer', (e) => e.getAttribute('vci-modal-state') === 'closing'), 'close marks the host closing, not gone');
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'vci-modal-sheet-out'), 'exit slides the panel back down');
+  ok(await page.evaluate(() => !vci.modal.isOpen('filters') && !vci.modal.openHosts().length), 'a leaving host does not report itself open');
+  await page.waitForTimeout(400);
+  ok(await page.$eval('.drawer', (e) => !e.hasAttribute('vci-modal-state') && !e.classList.contains('is-visible')), 'state attribute and open class both cleared once the exit lands');
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'none'), 'nothing is left applied, so both animations run again next open');
   ok(await page.evaluate(() => vci.lock.allows(document.body)), 'lock released: touches allowed again');
   await page.click('[vci-modal="open"][vci-modal-key="filters"]');
   // swipe down to dismiss. Let the entrance animation land first: measuring the
@@ -142,6 +146,7 @@ console.log('drawer');
   ok(await page.$eval('.drawer-panel', (e) => e.style.transform === ''), 'inline transform cleaned up');
   await page.click('[vci-modal="open"][vci-modal-key="filters"]');
   await page.click('[vci-modal="scrim"]', { position: { x: 4, y: 4 } });
+  await page.waitForTimeout(400);
   ok(await page.$eval('.drawer', (e) => !e.classList.contains('is-visible')), 'scrim click closes drawer');
   await ctx.close();
 }
@@ -172,9 +177,25 @@ console.log('drawer');
 }
 
 {
+  // reopening while it is still leaving
+  const { page, ctx } = await open();
+  await page.click('[vci-modal="open"][vci-modal-key="filters"]');
+  await page.$eval('.drawer-panel', (e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+  await page.evaluate(() => vci.modal.close('filters'));
+  ok(await page.$eval('.drawer', (e) => e.getAttribute('vci-modal-state') === 'closing'), 'mid-exit');
+  await page.evaluate(() => vci.modal.open('filters'));
+  ok(await page.$eval('.drawer', (e) => e.getAttribute('vci-modal-state') === 'open'), 'reopening mid-exit cancels the exit');
+  ok(await page.evaluate(() => vci.modal.isOpen('filters')), 'and it reports open again');
+  await page.waitForTimeout(400);
+  ok(await page.$eval('.drawer', (e) => e.classList.contains('is-visible')), 'the cancelled exit does not fire later and hide it');
+  await ctx.close();
+}
+{
   const { page, ctx } = await open({ reducedMotion: 'reduce' });
   await page.click('[vci-modal="open"][vci-modal-key="filters"]');
   ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'none'), 'reduced motion: entrance animation is dropped');
+  await page.evaluate(() => vci.modal.close('filters'));
+  ok(await page.$eval('.drawer', (e) => !e.classList.contains('is-visible')), 'reduced motion: close is immediate, not held open for an exit that never plays');
   await ctx.close();
 }
 {

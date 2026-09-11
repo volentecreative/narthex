@@ -1,4 +1,4 @@
-/*! narthex v0.4.0 — all modules — https://github.com/volentecreative/narthex
+/*! narthex v0.5.0 — all modules — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.4.0';
+  vci.version = '0.5.0';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -254,6 +254,10 @@
  *              Default none, so a host that already animates itself is left
  *              alone. Needs at least one vci-modal="part" to animate.
  *   enter-duration  length of that animation. Default 300ms.
+ *   exit       how it leaves. "match" (default) mirrors enter, or name one of
+ *              the same values, or "none" to snap away.
+ *   exit-duration   length of the exit. Default 250ms — a little quicker than
+ *              the entrance, which is how a leaving thing should feel.
  *
  * EVENTS  vci:modal:open / vci:modal:close on the host, detail { key, host, trigger }.
  *
@@ -261,9 +265,16 @@
  * a script that owned the dialog before narthex did. Every host's class is
  * watched, so the scroll lock, aria and events stay truthful either way.
  *
- * An open host also carries vci-modal-state="open". The open class is the
- * site's to name (vci-modal-class), so anything this module styles keys off
- * that attribute instead, and site CSS can use it the same way.
+ * An open host also carries vci-modal-state="open", and vci-modal-state="closing"
+ * while an exit animation plays. The open class is the site's to name
+ * (vci-modal-class), so anything this module styles keys off that attribute
+ * instead, and site CSS can use it the same way.
+ *
+ * A host with an exit keeps the open class until the animation ends — it is
+ * the site's own open styling that keeps the host painted, and dropping it is
+ * what makes a close look instant. The bookkeeping does not wait: the scroll
+ * lock, aria, ?modal= and vci:modal:close all happen the moment close is
+ * asked for, so isOpen() never claims a leaving host is open.
  * API     vci.modal.open(key, triggerEl?) · close(keyOrEl?, restore?) · closeAll(restore?)
  *         · isOpen(key) · resolve(key)
  *         restore=false leaves focus where it is on close, for a caller that
@@ -283,6 +294,7 @@ vci.define('modal', function (vci) {
   var CTRL = 'button, a, input, select, textarea, label, [role="button"]';
   var A = vci.attrName;
   var ST = '[' + A('modal-state') + '="open"]';
+  var CL = '[' + A('modal-state') + '="closing"]';
   var lastTrigger = null;
   var drag = null;
 
@@ -415,6 +427,26 @@ vci.define('modal', function (vci) {
     return ENTER[v] ? v : 'none';
   }
   function enterSel(v) { return '[' + A('modal-enter') + '="' + v + '"]' + ST; }
+  function exitOf(el) {
+    var v = vci.config(M, 'exit', 'match', el);
+    if (v === 'match') v = enterOf(el);
+    return ENTER[v] ? v : 'none';
+  }
+  function exitSel(v) { return '[' + A('modal-exit') + '="' + v + '"]' + CL; }
+  function reduced() {
+    return !!(w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+  // "300ms" / "0.3s" / "300" -> 300
+  function toMs(v, fallback) {
+    var n = parseFloat(v);
+    if (isNaN(n)) return fallback;
+    v = String(v).trim();
+    return /ms$/.test(v) ? n : (/s$/.test(v) ? n * 1000 : n);
+  }
+  function exitMs(el) {
+    if (exitOf(el) === 'none' || reduced()) return 0;
+    return toMs(vci.config(M, 'exit-duration', '250ms', el), 250);
+  }
   var cssDone = false;
   function injectEnterCss() {
     if (cssDone) return;
@@ -429,6 +461,12 @@ vci.define('modal', function (vci) {
       backs.push(enterSel(v) + ' ' + vci.sel(M, 'dim'), enterSel(v) + ' ' + vci.sel(M, 'scrim'));
     }
     var every = panels.concat(backs).join(',');
+    var exitPanels = [], exitBacks = [];
+    for (var v2 in ENTER) {
+      exitPanels.push(exitSel(v2) + ' ' + part);
+      exitBacks.push(exitSel(v2) + ' ' + vci.sel(M, 'dim'), exitSel(v2) + ' ' + vci.sel(M, 'scrim'));
+    }
+    var everyExit = exitPanels.concat(exitBacks).join(',');
     vci.css('modal-enter',
       '@keyframes vci-modal-fade{from{opacity:0}}' +
       '@keyframes vci-modal-rise{from{opacity:0;transform:translateY(.75rem)}}' +
@@ -444,21 +482,40 @@ vci.define('modal', function (vci) {
       enterSel('sheet') + ' ' + part + '{animation-name:vci-modal-rise}' +
       '@media ' + mq + '{' + enterSel('sheet') + ' ' + part +
         '{animation-name:vci-modal-sheet;animation-timing-function:cubic-bezier(.2,.9,.25,1)}}' +
-      '@media (prefers-reduced-motion:reduce){' + every + '{animation:none}}');
+      // Leaving. fill-mode forwards holds the end state until the open class
+      // drops, so there is no frame of the panel snapping back before it goes;
+      // the state attribute comes off at the same moment, so nothing lingers
+      // to outrank a drawer's inline drag transform later.
+      '@keyframes vci-modal-fade-out{to{opacity:0}}' +
+      '@keyframes vci-modal-rise-out{to{opacity:0;transform:translateY(.75rem)}}' +
+      '@keyframes vci-modal-sheet-out{to{transform:translateY(100%)}}' +
+      CL + '{pointer-events:none}' +
+      everyExit + '{animation-duration:var(--vci-modal-exit,250ms);' +
+        'animation-timing-function:cubic-bezier(.4,0,1,1);animation-fill-mode:forwards}' +
+      exitBacks.join(',') + '{animation-name:vci-modal-fade-out;animation-timing-function:ease}' +
+      exitSel('fade') + ' ' + part + '{animation-name:vci-modal-fade-out}' +
+      exitSel('rise') + ' ' + part + '{animation-name:vci-modal-rise-out}' +
+      exitSel('sheet') + ' ' + part + '{animation-name:vci-modal-rise-out}' +
+      '@media ' + mq + '{' + exitSel('sheet') + ' ' + part +
+        '{animation-name:vci-modal-sheet-out}}' +
+      '@media (prefers-reduced-motion:reduce){' + every + ',' + everyExit + '{animation:none}}');
   }
   var enterArmed = new WeakMap();
   function armEnter(el) {
     if (enterArmed.has(el)) return;
     enterArmed.set(el, true);
-    var en = enterOf(el);
-    if (en === 'none') return;
+    var en = enterOf(el), ex = exitOf(el);
+    if (en === 'none' && ex === 'none') return;
     injectEnterCss();
     // Settings resolve through ancestors, vci.settings and the script tag, but
-    // the CSS has to match on the host, so write the resolved value back onto
-    // it. Same value it already had when it was set there directly.
-    el.setAttribute(A('modal-enter'), en);
+    // the CSS has to match on the host, so write the resolved values back onto
+    // it. Same value they already had when set there directly.
+    if (en !== 'none') el.setAttribute(A('modal-enter'), en);
+    if (ex !== 'none') el.setAttribute(A('modal-exit'), ex);
     var dur = vci.config(M, 'enter-duration', '', el);
     if (dur) el.style.setProperty('--vci-modal-enter', dur);
+    var xdur = vci.config(M, 'exit-duration', '', el);
+    if (xdur) el.style.setProperty('--vci-modal-exit', xdur);
   }
 
   // The inline media query closes the host when the viewport crosses into
@@ -497,7 +554,11 @@ vci.define('modal', function (vci) {
     k = keyOf(el);
     if (isInline(el)) return false;
     var cls = openClass(el);
-    if (el.classList.contains(cls)) return true;
+    // Caught on the way out: cancel the exit and open again from wherever the
+    // animation had got to, rather than reporting it already open and doing
+    // nothing while it finishes leaving.
+    if (closing.get(el)) cancelExit(el);
+    else if (el.classList.contains(cls)) return true;
     if (vci.emit(el, 'modal:beforeopen', { key: k, host: el, trigger: trig || null }, true).defaultPrevented) return false;
     openEls().forEach(function (o) { if (o !== el) hide(o, false); });
 
@@ -510,14 +571,37 @@ vci.define('modal', function (vci) {
     return true;
   }
 
-  function hide(el, restore) {
+  // An exit needs the host to stay painted after close is asked for, and what
+  // paints it is the site's own open class — so that one class is the only
+  // thing that waits. Everything else in applyClose runs now.
+  var closing = new WeakMap();
+  function cancelExit(el) {
+    var c = closing.get(el);
+    if (!c) return;
+    clearTimeout(c.timer);
+    closing['delete'](el);
+    el.removeAttribute(A('modal-state'));
+  }
+  function drop(el, cls) {
+    cancelExit(el);
+    parts(el).forEach(function (p) { p.classList.remove(cls); });
+  }
+  // immediate: the caller already played the exit itself — a drawer dragged
+  // off-screen has nothing left to animate and should not wait to be hidden.
+  function hide(el, restore, immediate) {
     el = resolve(el);
     if (!el) return false;
     var cls = openClass(el);
     if (!el.classList.contains(cls)) return false;
+    if (closing.get(el)) return false;
     watch(el);
     applyClose(el, keyOf(el));
-    parts(el).forEach(function (p) { p.classList.remove(cls); });
+    var wait = immediate ? 0 : exitMs(el);
+    if (!wait) drop(el, cls);
+    else {
+      el.setAttribute(A('modal-state'), 'closing');
+      closing.set(el, { timer: setTimeout(function () { drop(el, cls); }, wait + 30) });
+    }
     if (lastTrigger && restore !== false && lastTrigger.focus) lastTrigger.focus();
     lastTrigger = null;
     return true;
@@ -638,7 +722,7 @@ vci.define('modal', function (vci) {
     function fin() {
       if (done) return; done = true;
       dg.panel.removeEventListener('transitionend', onEnd);
-      if (kill) { hide(dg.root, true); setTimeout(clean, HIDE_MS); } else clean();
+      if (kill) { hide(dg.root, true, true); setTimeout(clean, HIDE_MS); } else clean();
     }
     function onEnd(ev) {
       if (ev.target === dg.panel && ev.propertyName === 'transform') fin();
@@ -684,9 +768,14 @@ vci.define('modal', function (vci) {
       return k == null ? (closeAll(restore), true) : hide(k, restore);
     },
     closeAll: function (restore) { closeAll(restore !== false); },
-    isOpen: function (k) { var el = resolve(k); return !!el && el.classList.contains(openClass(el)); },
+    isOpen: function (k) {
+      var el = resolve(k);
+      return !!el && el.classList.contains(openClass(el)) && !closing.get(el);
+    },
     resolve: resolve,
-    openHosts: openEls
+    openHosts: function () {
+      return openEls().filter(function (el) { return !closing.get(el); });
+    }
   };
 });
 
