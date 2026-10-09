@@ -66,6 +66,7 @@ cannot drift.
 | **modal** | [`src/modules/modal.js`](src/modules/modal.js) | Modals and bottom-sheet drawers. Roles `dialog` / `drawer` / `open` / `close` / `part` / `handle` / `scrim` / `dim` / `field` / `title`. Focus trap, Escape, scroll lock, `?modal=<key>` deep links, swipe-to-dismiss, a media query that makes a drawer inline content on desktop, and an opt-in entrance/exit animation (`vci-modal-enter` / `vci-modal-exit`). |
 | **accordion** | [`src/modules/accordion.js`](src/modules/accordion.js) | Roles `item` / `trigger` / `body` / `icon` / `group`. Owns the collapse mechanics (grid-rows animation, `aria-expanded`, `inert`) and leaves the look to your classes. `vci-accordion="richtext"` converts a rich-text field: H1 → section, H2–H6 → row, `<hr>` closes a row. |
 | **nav** | [`src/modules/nav.js`](src/modules/nav.js) | `header` writes `--header-height` and `--nav-offset` to `<html>`. `menu` / `toggle` / `dim` run the mobile menu: on a Webflow navbar it watches the `w--open` class on `.w-nav-button` and owns nothing, and on a hand-built header (just divs) it owns the open class itself. Either way you get the dim, `aria-expanded`, Escape, a keyboard-operable hamburger, and the scroll lock shared with modal. |
+| **form** | [`src/modules/form.js`](src/modules/form.js) | Roles `form` / `field` / `message` / `turnstile`. Live validation on the browser's own rules (plus a stricter email and no spaces-only required fields): a field shows valid as you type, invalid once it has been edited and left or a submit was tried, with the message text set and `aria-invalid` / `aria-describedby` wired. A bad submit is stopped before Webflow's handler sees it. `vci-form="turnstile"` renders Cloudflare Turnstile (lazily, when it comes into view) and holds the submit until its token arrives. |
 | **scroll** | [`src/modules/scroll.js`](src/modules/scroll.js) | `<script … vci-scroll="native">` turns off Webflow's jQuery anchor scroll and uses `scroll-behavior: smooth` + `:target { scroll-margin-top }`, which respects the header offset and reduced-motion. |
 Every module exposes an API on `window.vci.<module>` and fires
 `vci:<module>:<event>` DOM events (bubbling, with `detail`), so site-specific
@@ -91,6 +92,17 @@ code can listen instead of watching class mutations.
     <div class="drawer-header" vci-modal="handle">…</div>
   </div>
 </div>
+
+<!-- form, with Turnstile; the look of is-valid / is-invalid is your classes -->
+<form vci-form="form" vci-form-valid-text="Good copy">
+  <div class="form_field" vci-form="field">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required>
+    <div class="form_message" vci-form="message"></div>
+  </div>
+  <div vci-form="turnstile" vci-form-sitekey="0x4AAAA…"></div>
+  <button type="submit">Send</button>
+</form>
 
 <!-- accordion -->
 <div vci-accordion="group" vci-accordion-single="true">

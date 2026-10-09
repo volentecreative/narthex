@@ -1,9 +1,10 @@
 {
-  "version": "0.5.1",
+  "version": "0.6.0",
   "modules": [
     "modal",
     "accordion",
     "nav",
-    "scroll"
+    "scroll",
+    "form"
   ]
 }
