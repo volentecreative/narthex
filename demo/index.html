@@ -54,15 +54,6 @@
   .acc-trigger { display: flex; justify-content: space-between; align-items: center; width: 100%; background: none; border: 0; color: inherit; padding: .9rem 0; text-align: left; cursor: pointer; font-weight: 600; }
   .acc-text > :last-child { margin-bottom: 1rem; }
 
-  /* form: narthex sets is-valid / is-invalid and the message text; the look is here */
-  .fld { display: grid; gap: .25rem; margin-bottom: .75rem; }
-  .fld input, .fld select, .fld textarea { font: inherit; padding: .45rem .6rem; border: 1px solid #b9c4c7; border-radius: 4px; }
-  .fld input.is-valid, .fld select.is-valid, .fld textarea.is-valid { border-color: #2e7d4f; }
-  .fld input.is-invalid, .fld select.is-invalid, .fld textarea.is-invalid { border-color: #b3261e; }
-  .fld-msg { min-height: 1.25em; font-size: .8rem; }
-  .fld-msg.is-valid { color: #2e7d4f; }
-  .fld-msg.is-invalid { color: #b3261e; }
-
 </style>
 </head>
 <body>
@@ -90,38 +81,6 @@
     <h2>Modal</h2>
     <button type="button" vci-modal="open" vci-modal-key="connect" vci-modal-value="Josh">Open connect modal</button>
     <button type="button" vci-modal="open" vci-modal-key="global-search">Open search (id-resolved)</button>
-  </section>
-
-  <section>
-    <h2>Form</h2>
-    <form id="demo-form" vci-form="form" vci-form-valid-text="Good copy" action="#" onsubmit="event.preventDefault(); this.setAttribute('data-sent', String(+(this.getAttribute('data-sent') || 0) + 1))">
-      <div class="fld" vci-form="field">
-        <label for="f-name">Name</label>
-        <input id="f-name" name="name" type="text" required>
-        <div class="fld-msg" vci-form="message"></div>
-      </div>
-      <div class="fld" vci-form="field">
-        <label for="f-email">Email</label>
-        <input id="f-email" name="email" type="email" required>
-        <div class="fld-msg" vci-form="message"></div>
-      </div>
-      <div class="fld" vci-form="field">
-        <label for="f-kind">Kind</label>
-        <select id="f-kind" name="kind" required><option value="">Select one…</option><option>Sales</option><option>Press</option></select>
-        <div class="fld-msg" vci-form="message"></div>
-      </div>
-      <div class="fld" vci-form="field" vci-form-valid-text="Message received">
-        <label for="f-msg">Message</label>
-        <textarea id="f-msg" name="message" minlength="10" required></textarea>
-        <div class="fld-msg" vci-form="message"></div>
-      </div>
-      <div class="fld" vci-form="field">
-        <!-- Cloudflare's test key: always passes, on any host. -->
-        <div vci-form="turnstile" vci-form-sitekey="1x00000000000000000000AA" vci-form-response-field="false"></div>
-        <div class="fld-msg" vci-form="message"></div>
-      </div>
-      <button type="submit">Send</button>
-    </form>
   </section>
 
   <section>
