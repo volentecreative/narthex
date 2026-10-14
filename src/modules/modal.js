@@ -172,6 +172,13 @@ vci.define('modal', function (vci) {
   // change itself so the observer below can apply it when the class was
   // toggled by someone else.
   var state = new WeakMap();
+  // Parts a drag took off their entrance animation, still held off it (see
+  // endDrag). Released on close, so the exit and the next entrance play.
+  var held = new WeakMap();
+  function release(el) {
+    (held.get(el) || []).forEach(function (n) { n.style.animation = ''; });
+    held.delete(el);
+  }
   function applyOpen(el, k, trig) {
     state.set(el, true);
     if (!el.hasAttribute('role')) el.setAttribute('role', 'dialog');
@@ -185,6 +192,7 @@ vci.define('modal', function (vci) {
   }
   function applyClose(el, k) {
     state.set(el, false);
+    release(el);
     el.removeAttribute('aria-modal');
     el.removeAttribute(A('modal-state'));
     vci.lock.release(M + ':' + k);
@@ -497,12 +505,20 @@ vci.define('modal', function (vci) {
       try { dg.handle.releasePointerCapture(dg.id); } catch (x) {}
     }
     var kill = dg.dy > dg.h * RATIO || dg.vel > VEL, done = false;
+    // A drawer that snaps back stays held off its entrance animation:
+    // clearing animation:none would hand the parts their animation-name
+    // again, and a newly applied animation starts over - the whole entrance
+    // replayed under a drawer that was already open. The hold lasts until the
+    // drawer closes (applyClose releases it). A dismissed drawer is closed
+    // already by the time this runs, so it lets go here.
     function clean() {
       dg.panel.style.transition = ''; dg.panel.style.transform = '';
-      dg.panel.style.animation = '';
-      if (dg.scrim) {
-        dg.scrim.style.transition = ''; dg.scrim.style.opacity = '';
-        dg.scrim.style.animation = '';
+      if (dg.scrim) { dg.scrim.style.transition = ''; dg.scrim.style.opacity = ''; }
+      var parts = dg.scrim ? [dg.panel, dg.scrim] : [dg.panel];
+      if (kill || !state.get(dg.root)) {
+        parts.forEach(function (n) { n.style.animation = ''; });
+      } else {
+        held.set(dg.root, parts);
       }
     }
     function fin() {
