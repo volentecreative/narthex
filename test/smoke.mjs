@@ -143,6 +143,23 @@ console.log('drawer');
   await page.$eval('.drawer-panel', (e) => Promise.all(e.getAnimations().map((a) => a.finished)));
   const h = await page.$('[vci-modal="handle"]');
   const box = await h.boundingBox();
+  // a short drag snaps back - and must not replay the entrance once it lands
+  await page.mouse.move(box.x + 50, box.y + 10);
+  await page.mouse.down();
+  // slowly, so it reads as a drag rather than a flick (a flick dismisses)
+  for (let i = 1; i <= 3; i++) { await page.mouse.move(box.x + 50, box.y + 10 + i * 10); await page.waitForTimeout(60); }
+  await page.waitForTimeout(100);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  ok(await page.$eval('.drawer', (e) => e.classList.contains('is-visible')), 'a short drag snaps back open');
+  ok(await page.$eval('.drawer-panel', (e) => !e.getAnimations().length && e.style.transform === ''), 'snapping back does not replay the entrance animation');
+  ok(await page.$eval('[vci-modal="scrim"]', (e) => !e.getAnimations().length), 'nor the scrim fade');
+  await page.evaluate(() => vci.modal.close('filters'));
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'vci-modal-sheet-out'), 'after a snap-back, close still plays the exit');
+  await page.waitForTimeout(400);
+  await page.click('[vci-modal="open"][vci-modal-key="filters"]');
+  ok(await page.$eval('.drawer-panel', (e) => getComputedStyle(e).animationName === 'vci-modal-sheet'), 'and the next open plays the entrance again');
+  await page.$eval('.drawer-panel', (e) => Promise.all(e.getAnimations().map((a) => a.finished)));
   await page.mouse.move(box.x + 50, box.y + 10);
   await page.mouse.down();
   for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + 50, box.y + 10 + i * 40);
