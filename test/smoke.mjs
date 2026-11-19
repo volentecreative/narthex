@@ -314,6 +314,92 @@ console.log('scroll');
   await ctx.close();
 }
 
+console.log('image');
+{
+  // Hold every image request open, so each image is still loading when the
+  // module looks at it. An image that has already finished (or failed, as the
+  // demo's placeholder files do) is correctly left alone, which would make
+  // these checks a race.
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 800 } });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.route('**/img/**', () => {});
+  await page.goto(url);
+  ok(await page.evaluate(() => vci.image.enabled()), 'enabled from the script tag');
+  ok(await page.$eval('#image-sized', (e) => e.getAttribute('sizes') === '240px'), 'sizes set to the rendered width');
+  ok(await page.$eval('#image-skipped', (e) => e.getAttribute('sizes') === '100vw'), 'vci-image-skip on an ancestor leaves sizes alone');
+  // an image added later is caught as it is inserted, and announces itself
+  const added = await page.evaluate(() => new Promise((res) => {
+    const got = [];
+    document.addEventListener('vci:image:sized', (e) => got.push(e.detail.width));
+    const img = document.createElement('img');
+    img.id = 'image-late'; img.alt = '';
+    img.style.cssText = 'display:block;width:100%;height:80px';
+    img.setAttribute('srcset', 'img/late-500.jpg 500w, img/late-1600.jpg 1600w');
+    img.setAttribute('sizes', '100vw');
+    document.getElementById('image-box').appendChild(img);
+    setTimeout(() => res({ sizes: img.getAttribute('sizes'), got }), 50);
+  }));
+  ok(added.sizes === '240px' && added.got.join() === '240', 'inserted image sized, vci:image:sized fired with the width');
+  // object-fit: cover needs the longer side covered
+  ok(await page.evaluate(() => new Promise((res) => {
+    const img = document.createElement('img');
+    img.alt = ''; img.style.cssText = 'display:block;width:100px;height:300px;object-fit:cover';
+    img.setAttribute('srcset', 'img/cover-500.jpg 500w, img/cover-1600.jpg 1600w');
+    document.getElementById('image-box').appendChild(img);
+    setTimeout(() => res(img.getAttribute('sizes') === '300px'), 50);
+  })), 'object-fit: cover uses the longer rendered side');
+  // an image with no layout yet is sized once it has one
+  ok(await page.evaluate(() => new Promise((res) => {
+    const img = document.createElement('img');
+    img.alt = ''; img.style.cssText = 'display:none;width:100%;height:80px';
+    img.setAttribute('srcset', 'img/hidden-500.jpg 500w, img/hidden-1600.jpg 1600w');
+    img.setAttribute('sizes', '100vw');
+    document.getElementById('image-box').appendChild(img);
+    setTimeout(() => {
+      const before = img.getAttribute('sizes');
+      img.style.display = 'block';
+      setTimeout(() => res(before === '100vw' && img.getAttribute('sizes') === '240px'), 100);
+    }, 50);
+  })), 'hidden image waits, then is sized when it gets a layout');
+  // resize only ever grows sizes
+  ok(await page.evaluate(() => new Promise((res) => {
+    const box = document.getElementById('image-box'), img = document.getElementById('image-sized');
+    box.style.width = '120px'; window.dispatchEvent(new Event('resize'));
+    setTimeout(() => {
+      const shrunk = img.getAttribute('sizes');
+      box.style.width = '400px'; window.dispatchEvent(new Event('resize'));
+      setTimeout(() => res(shrunk === '240px' && img.getAttribute('sizes') === '400px'), 300);
+    }, 300);
+  })), 'resize grows sizes, never shrinks it');
+  // too late to help: an image that has already loaded keeps the sizes it loaded with
+  ok(await page.evaluate(() => new Promise((res) => {
+    const img = document.createElement('img');
+    img.alt = ''; img.style.cssText = 'display:block;width:100%;height:80px';
+    img.setAttribute('sizes', '100vw');
+    img.onload = () => { document.getElementById('image-box').appendChild(img); setTimeout(() => res(img.getAttribute('sizes') === '100vw'), 50); };
+    img.setAttribute('srcset', 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw== 500w');
+  })), 'an image that already loaded is left alone');
+  ok(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+}
+{
+  // not opted in: the module is present but touches nothing
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto('file://' + join(root, 'test/fixtures/isolation.html'));
+  await page.addScriptTag({ path: join(root, 'dist/image.js') });
+  ok(await page.evaluate(() => new Promise((res) => {
+    const img = document.createElement('img');
+    img.alt = ''; img.style.cssText = 'display:block;width:200px;height:80px';
+    img.setAttribute('srcset', 'a-500.jpg 500w, a-1600.jpg 1600w'); img.setAttribute('sizes', '100vw');
+    document.body.appendChild(img);
+    setTimeout(() => res(!vci.image.enabled() && img.getAttribute('sizes') === '100vw'), 50);
+  })), 'off unless opted in');
+  await ctx.close();
+}
+
 console.log('bundle isolation');
 {
   const ctx = await browser.newContext();

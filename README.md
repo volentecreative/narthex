@@ -66,6 +66,7 @@ cannot drift.
 | **modal** | [`src/modules/modal.js`](src/modules/modal.js) | Modals and bottom-sheet drawers. Roles `dialog` / `drawer` / `open` / `close` / `part` / `handle` / `scrim` / `dim` / `field` / `title`. Focus trap, Escape, scroll lock, `?modal=<key>` deep links, swipe-to-dismiss, a media query that makes a drawer inline content on desktop, and an opt-in entrance/exit animation (`vci-modal-enter` / `vci-modal-exit`). |
 | **accordion** | [`src/modules/accordion.js`](src/modules/accordion.js) | Roles `item` / `trigger` / `body` / `icon` / `group`. Owns the collapse mechanics (grid-rows animation, `aria-expanded`, `inert`) and leaves the look to your classes. `vci-accordion="richtext"` converts a rich-text field: H1 → section, H2–H6 → row, `<hr>` closes a row. |
 | **nav** | [`src/modules/nav.js`](src/modules/nav.js) | `header` writes `--header-height` and `--nav-offset` to `<html>`. `menu` / `toggle` / `dim` run the mobile menu: on a Webflow navbar it watches the `w--open` class on `.w-nav-button` and owns nothing, and on a hand-built header (just divs) it owns the open class itself. Either way you get the dim, `aria-expanded`, Escape, a keyboard-operable hamburger, and the scroll lock shared with modal. |
+| **image** | [`src/modules/image.js`](src/modules/image.js) | `<script … vci-image="sizes">` in the **head** sets every image's `sizes` to the width it is rendered at, so the browser downloads the smallest `srcset` file that fits instead of Webflow's `100vw` guess. `vci-image-skip="true"` on an image or a wrapper opts it out. |
 | **scroll** | [`src/modules/scroll.js`](src/modules/scroll.js) | `<script … vci-scroll="native">` turns off Webflow's jQuery anchor scroll and uses `scroll-behavior: smooth` + `:target { scroll-margin-top }`, which respects the header offset and reduced-motion. |
 Every module exposes an API on `window.vci.<module>` and fires
 `vci:<module>:<event>` DOM events (bubbling, with `detail`), so site-specific
@@ -116,6 +117,11 @@ code can listen instead of watching class mutations.
   <div class="navbar_hamburger" vci-nav="toggle"></div>
 </nav>
 <div class="navbar_dim" vci-nav="dim" vci-nav-key="main"></div>
+
+<!-- right-sized images: this one goes in the HEAD, not deferred, so it sees
+     each <img> before the browser starts downloading it -->
+<script src="…/image.min.js" vci-image="sizes"></script>
+<div vci-image-skip="true"><img srcset="…" sizes="100vw"></div>  <!-- left alone -->
 ```
 
 The demo page [`demo/index.html`](demo/index.html) has a working instance of
