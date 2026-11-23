@@ -314,6 +314,41 @@ console.log('scroll');
   await ctx.close();
 }
 
+console.log('dropdown');
+{
+  const { page, ctx, errors } = await open({ viewport: { width: 800, height: 900 } });
+  await page.evaluate(() => document.getElementById('dropdown-demo').scrollIntoView({ behavior: 'instant', block: 'start' }));
+  await page.waitForTimeout(400);
+  const box = async (sel) => (await page.$(sel)).boundingBox();
+  const openOf = () => page.evaluate(() => ['dd-a', 'dd-b'].filter((id) => document.querySelector('#' + id + ' .w-dropdown-list').classList.contains('w--open')).join());
+  const a = await box('#dd-a .w-dropdown-toggle');
+  const reset = async () => { await page.mouse.move(700, 880); await page.waitForTimeout(50); await page.mouse.move(a.x + 60, a.y + 8); await page.mouse.move(a.x + 62, a.y + 10); };
+  // Diagonal from About's tab into its panel, through Connect's tab.
+  await reset();
+  ok(await openOf() === 'dd-a', 'hover opens the first dropdown');
+  await page.mouse.move(a.x + 230, a.y + 120, { steps: 14 });
+  ok(await openOf() === 'dd-a', 'diagonal into the panel across the next tab keeps it open');
+  await page.waitForTimeout(200);
+  ok(await openOf() === 'dd-a', '…and it stays open once the panel is reached');
+  // Sideways to the next tab: switches at once.
+  await reset();
+  await page.mouse.move(a.x + 120, a.y + 10, { steps: 6 });
+  ok(await openOf() === 'dd-b', 'a sideways move switches tabs at once');
+  // Heading down into the next tab and resting there: it opens after the rest.
+  await reset();
+  await page.mouse.move(a.x + 100, a.y + 30, { steps: 6 });
+  const during = await openOf();
+  await page.waitForTimeout(200);
+  ok(during === 'dd-a' && await openOf() === 'dd-b', 'resting on the next tab opens it after the pause');
+  // Turned off.
+  await page.evaluate(() => document.querySelector('[vci-dropdown="group"]').setAttribute('vci-dropdown-safe-triangle', 'false'));
+  await reset();
+  await page.mouse.move(a.x + 230, a.y + 120, { steps: 14 });
+  ok(await openOf() !== 'dd-a', 'safe-triangle="false" leaves hovers alone');
+  ok(!errors.length, 'no errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+}
+
 console.log('tooltip');
 {
   const { page, ctx, errors } = await open();

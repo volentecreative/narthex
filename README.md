@@ -6,7 +6,7 @@ One script, one attribute vocabulary, no per-site reinvention.
 The idea is [Finsweet Attributes](https://finsweet.com/attributes) but for the
 things we keep rebuilding on every build: modals and bottom-sheet drawers,
 accordions (including rich-text-to-accordion), header offsets, native
-smooth scroll, and tooltips. Site-specific behaviour (a church's livestream notice, a
+smooth scroll, hover-dropdown safe triangles, and tooltips. Site-specific behaviour (a church's livestream notice, a
 MinistryPlatform widget theme) stays in that site's own repo.
 
 ```html
@@ -66,6 +66,7 @@ cannot drift.
 | **modal** | [`src/modules/modal.js`](src/modules/modal.js) | Modals and bottom-sheet drawers. Roles `dialog` / `drawer` / `open` / `close` / `part` / `handle` / `scrim` / `dim` / `field` / `title`. Focus trap, Escape, scroll lock, `?modal=<key>` deep links, swipe-to-dismiss, a media query that makes a drawer inline content on desktop, and an opt-in entrance/exit animation (`vci-modal-enter` / `vci-modal-exit`). |
 | **accordion** | [`src/modules/accordion.js`](src/modules/accordion.js) | Roles `item` / `trigger` / `body` / `icon` / `group`. Owns the collapse mechanics (grid-rows animation, `aria-expanded`, `inert`) and leaves the look to your classes. `vci-accordion="richtext"` converts a rich-text field: H1 → section, H2–H6 → row, `<hr>` closes a row. |
 | **nav** | [`src/modules/nav.js`](src/modules/nav.js) | `header` writes `--header-height` and `--nav-offset` to `<html>`. `menu` / `toggle` / `dim` run the mobile menu: on a Webflow navbar it watches the `w--open` class on `.w-nav-button` and owns nothing, and on a hand-built header (just divs) it owns the open class itself. Either way you get the dim, `aria-expanded`, Escape, a keyboard-operable hamburger, and the scroll lock shared with modal. |
+| **dropdown** | [`src/modules/dropdown.js`](src/modules/dropdown.js) | A safe triangle for hover dropdowns. `vci-dropdown="group"` on the wrapper (a navbar menu): moving diagonally from a tab down into its open panel no longer opens the neighbouring tab it crosses, or closes the open one. Resting on the other tab, or turning away, lets it through. Works with stock Webflow dropdowns (holds back their mouseover/mouseout while aiming); `item` / `list` / `class` settings for any other hover menu. |
 | **scroll** | [`src/modules/scroll.js`](src/modules/scroll.js) | `<script … vci-scroll="native">` turns off Webflow's jQuery anchor scroll and uses `scroll-behavior: smooth` + `:target { scroll-margin-top }`, which respects the header offset and reduced-motion. |
 | **tooltip** | [`src/modules/tooltip.js`](src/modules/tooltip.js) | `vci-tooltip="Copy transcript"` on any element shows that text on mouse hover (after a short delay) and keyboard focus, never on touch. Empty value uses the element's `aria-label`. One shared, viewport-aware tooltip; the look is your class (`vci-tooltip-class`, default `tooltip`). Delegated, so script-built UI needs nothing. |
 Every module exposes an API on `window.vci.<module>` and fires

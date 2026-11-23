@@ -138,6 +138,31 @@
   <p><a href="#faq">Anchor to FAQ</a></p>
 </main>
 
+<section id="dropdown-demo" style="padding:1rem;position:relative;height:220px">
+  <h2 style="margin:0 0 .5rem">dropdown</h2>
+  <nav vci-dropdown="group" style="position:relative;display:flex">
+    <div class="w-dropdown" id="dd-a" style="position:relative"><div class="w-dropdown-toggle" style="width:80px;height:40px;background:#eee">About</div>
+      <div class="w-dropdown-list" style="position:absolute;top:40px;left:0;width:300px;height:120px;background:#ddd"><a href="#dd">A link</a></div></div>
+    <div class="w-dropdown" id="dd-b" style="position:relative"><div class="w-dropdown-toggle" style="width:80px;height:40px;background:#e4e4e4">Connect</div>
+      <div class="w-dropdown-list" style="position:absolute;top:40px;left:0;width:300px;height:120px;background:#ccc"><a href="#dd">B link</a></div></div>
+  </nav>
+  <style>.w-dropdown-list{display:none}.w-dropdown-list.w--open{display:block}</style>
+  <script>
+    // Stand-in for Webflow's hover dropdown: jQuery mouseenter/mouseleave ride on mouseover/mouseout.
+    document.querySelectorAll('#dropdown-demo .w-dropdown').forEach(function (dd) {
+      var list = dd.querySelector('.w-dropdown-list');
+      dd.addEventListener('mouseover', function (e) {
+        if (e.relatedTarget && dd.contains(e.relatedTarget)) return;
+        document.querySelectorAll('#dropdown-demo .w-dropdown-list').forEach(function (l) { l.classList.toggle('w--open', l === list); });
+      });
+      dd.addEventListener('mouseout', function (e) {
+        if (e.relatedTarget && dd.contains(e.relatedTarget)) return;
+        list.classList.remove('w--open');
+      });
+    });
+  </script>
+</section>
+
 <section id="tooltip-demo" style="padding:2rem 1rem">
   <h2>tooltip</h2>
   <button type="button" vci-tooltip="Copy transcript">⧉</button>
