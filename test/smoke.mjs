@@ -314,6 +314,44 @@ console.log('scroll');
   await ctx.close();
 }
 
+console.log('tooltip');
+{
+  const { page, ctx, errors } = await open();
+  const tip = () => page.evaluate(() => { const t = document.querySelector('[vci-tooltip-el]'); return t && { open: t.getAttribute('vci-tooltip-state') === 'open', text: t.textContent, cls: t.className, side: t.getAttribute('vci-tooltip-placement'), r: t.getBoundingClientRect().toJSON() }; });
+  await page.hover('[vci-tooltip="Copy transcript"]');
+  await page.waitForTimeout(450);
+  let t = await tip();
+  ok(t && t.open && t.text === 'Copy transcript' && t.cls === 'tooltip', 'mouse hover shows the text, with the site class');
+  const btn = await page.$eval('[vci-tooltip="Copy transcript"]', (e) => e.getBoundingClientRect().toJSON());
+  ok(t.side === 'top' && t.r.bottom <= btn.top && t.r.left >= 4, 'placed above, kept inside the viewport');
+  ok(await page.$eval('[vci-tooltip="Copy transcript"]', (e) => e.getAttribute('aria-describedby') === document.querySelector('[vci-tooltip-el]').id), 'aria-describedby while shown');
+  await page.mouse.move(390, 790);
+  t = await tip();
+  ok(!t.open, 'pointer-out hides');
+  ok(await page.$eval('[vci-tooltip="Copy transcript"]', (e) => !e.hasAttribute('aria-describedby')), 'aria-describedby removed');
+  await page.hover('[aria-label="Download transcript"]');
+  await page.waitForTimeout(450);
+  t = await tip();
+  ok(t.open && t.text === 'Download transcript', 'empty value falls back to aria-label');
+  ok(await page.$eval('[aria-label="Download transcript"]', (e) => !e.hasAttribute('aria-describedby')), 'no describedby when it repeats the label');
+  await page.keyboard.press('Escape');
+  ok(!(await tip()).open, 'Escape hides');
+  await page.evaluate(() => vci.tooltip.show(document.querySelector('[vci-tooltip="Below"]')));
+  ok((await tip()).side === 'bottom', 'placement setting');
+  await page.evaluate(() => vci.tooltip.hide());
+  await page.evaluate(() => { const b = document.createElement('button'); b.setAttribute('vci-tooltip', 'Added later'); b.textContent = 'x'; b.id = 'late'; document.getElementById('tooltip-demo').appendChild(b); });
+  await page.hover('#late');
+  await page.waitForTimeout(450);
+  ok((await tip()).text === 'Added later', 'works on elements added after load');
+  ok(!errors.length, 'no errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+  const touch = await open({ hasTouch: true, isMobile: true });
+  await touch.page.tap('[vci-tooltip="Copy transcript"]');
+  await touch.page.waitForTimeout(450);
+  ok(await touch.page.evaluate(() => { const t = document.querySelector('[vci-tooltip-el]'); return !t || t.getAttribute('vci-tooltip-state') !== 'open'; }), 'touch never shows it');
+  await touch.ctx.close();
+}
+
 console.log('bundle isolation');
 {
   const ctx = await browser.newContext();

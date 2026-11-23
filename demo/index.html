@@ -138,6 +138,14 @@
   <p><a href="#faq">Anchor to FAQ</a></p>
 </main>
 
+<section id="tooltip-demo" style="padding:2rem 1rem">
+  <h2>tooltip</h2>
+  <button type="button" vci-tooltip="Copy transcript">⧉</button>
+  <button type="button" aria-label="Download transcript" vci-tooltip="">⬇</button>
+  <button type="button" vci-tooltip="Below" vci-tooltip-placement="bottom">↓</button>
+</section>
+<style>.tooltip{background:#222;color:#fff;font:12px/1.2 sans-serif;padding:4px 8px;border-radius:4px;white-space:nowrap}</style>
+
 <!-- modals live at body level -->
 <div class="modal" vci-modal="dialog" vci-modal-key="connect">
   <div class="modal-dim" vci-modal="dim"></div>
