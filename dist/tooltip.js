@@ -1,4 +1,4 @@
-/*! narthex v0.6.0 — tooltip — https://github.com/volentecreative/narthex
+/*! narthex v0.6.1 — tooltip — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.6.0';
+  vci.version = '0.6.1';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -229,8 +229,9 @@
  * the viewport. It shows after a short delay for a mouse, at once for keyboard
  * focus, never for touch, and hides on Escape, scroll, click and pointer-out.
  * Listeners are delegated, so elements added later (a CMS list, script-built
- * UI) need nothing. While shown, an element whose own accessible name differs
- * from the text gets aria-describedby pointing at the tooltip.
+ * UI) need nothing. Screen readers hear each label once: the tooltip itself is
+ * aria-hidden, and only when its text differs from the element's accessible name
+ * does the element get aria-describedby pointing at it while shown.
  *
  * SETTINGS (vci-tooltip-<setting>, on the element or any ancestor / <script> / vci.settings.tooltip)
  *   class      class on the tooltip element, for the site to style. Default tooltip.
@@ -263,6 +264,10 @@ vci.define('tooltip', function (vci) {
       tip = d.createElement('div');
       tip.id = A('tooltip') + '-' + Math.random().toString(36).slice(2, 8);
       tip.setAttribute('role', 'tooltip');
+      // Never read as page content: the element's own label already names it, and a tooltip
+      // that adds something reaches screen readers through aria-describedby (which reads
+      // hidden elements too). So nothing is announced twice.
+      tip.setAttribute('aria-hidden', 'true');
       tip.setAttribute(A('tooltip-el'), '');
       d.body.appendChild(tip);
       var css = '[' + A('tooltip-el') + ']{position:fixed;top:0;left:0;z-index:2147483000;pointer-events:none;visibility:hidden}' +

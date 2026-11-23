@@ -334,6 +334,7 @@ console.log('tooltip');
   t = await tip();
   ok(t.open && t.text === 'Download transcript', 'empty value falls back to aria-label');
   ok(await page.$eval('[aria-label="Download transcript"]', (e) => !e.hasAttribute('aria-describedby')), 'no describedby when it repeats the label');
+  ok(await page.evaluate(() => document.querySelector('[vci-tooltip-el]').getAttribute('aria-hidden') === 'true'), 'tooltip is never read as page content');
   await page.keyboard.press('Escape');
   ok(!(await tip()).open, 'Escape hides');
   await page.evaluate(() => vci.tooltip.show(document.querySelector('[vci-tooltip="Below"]')));
