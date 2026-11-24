@@ -388,6 +388,24 @@ console.log('tooltip');
   await touch.ctx.close();
 }
 
+console.log('words');
+{
+  const { page, ctx, errors } = await open();
+  const h = '[vci-words="reveal"]';
+  ok(await page.$eval(h, (e) => e.textContent.replace(/\s+/g, ' ').trim() === 'We exist to delight in Him.'), 'text unchanged after split');
+  ok(await page.$eval(h, (e) => e.querySelectorAll('[vci-words-unit]').length === 6 && !!e.querySelector('.lead svg')), 'words split, inner markup and icon kept');
+  ok(await page.$eval(h, (e) => getComputedStyle(e.querySelector('[vci-words-unit]')).opacity === '0'), 'hidden until in view');
+  const done = page.$eval(h, (e) => new Promise((r) => e.addEventListener('vci:words:done', () => r(true), { once: true })));
+  await page.$eval(h, (e) => e.scrollIntoView({ block: 'center' }));
+  ok(await done, 'vci:words:done fires');
+  ok(await page.$eval(h, (e) => e.classList.contains('is-revealed') && [...e.querySelectorAll('[vci-words-unit]')].every((u) => getComputedStyle(u).opacity === '1')), 'all words visible, is-revealed added');
+  ok(!errors.length, 'no errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+  const still = await open({ reducedMotion: 'reduce' });
+  ok(await still.page.$eval(h, (e) => getComputedStyle(e.querySelector('[vci-words-unit]')).opacity === '1'), 'reduced motion: shown, not hidden');
+  await still.ctx.close();
+}
+
 console.log('bundle isolation');
 {
   const ctx = await browser.newContext();

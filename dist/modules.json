@@ -1,11 +1,12 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "modules": [
     "modal",
     "accordion",
     "nav",
     "dropdown",
     "scroll",
-    "tooltip"
+    "tooltip",
+    "words"
   ]
 }

@@ -6,7 +6,7 @@ One script, one attribute vocabulary, no per-site reinvention.
 The idea is [Finsweet Attributes](https://finsweet.com/attributes) but for the
 things we keep rebuilding on every build: modals and bottom-sheet drawers,
 accordions (including rich-text-to-accordion), header offsets, native
-smooth scroll, hover-dropdown safe triangles, and tooltips. Site-specific behaviour (a church's livestream notice, a
+smooth scroll, hover-dropdown safe triangles, tooltips, and word-by-word reveals. Site-specific behaviour (a church's livestream notice, a
 MinistryPlatform widget theme) stays in that site's own repo.
 
 ```html
@@ -69,6 +69,7 @@ cannot drift.
 | **dropdown** | [`src/modules/dropdown.js`](src/modules/dropdown.js) | A safe triangle for hover dropdowns. `vci-dropdown="group"` on the wrapper (a navbar menu): moving diagonally from a tab down into its open panel no longer opens the neighbouring tab it crosses, or closes the open one. Resting on the other tab, or turning away, lets it through. Works with stock Webflow dropdowns (holds back their mouseover/mouseout while aiming); `item` / `list` / `class` settings for any other hover menu. |
 | **scroll** | [`src/modules/scroll.js`](src/modules/scroll.js) | `<script … vci-scroll="native">` turns off Webflow's jQuery anchor scroll and uses `scroll-behavior: smooth` + `:target { scroll-margin-top }`, which respects the header offset and reduced-motion. |
 | **tooltip** | [`src/modules/tooltip.js`](src/modules/tooltip.js) | `vci-tooltip="Copy transcript"` on any element shows that text on mouse hover (after a short delay) and keyboard focus, never on touch. Empty value uses the element's `aria-label`. One shared, viewport-aware tooltip; the look is your class (`vci-tooltip-class`, default `tooltip`). Delegated, so script-built UI needs nothing. |
+| **words** | [`src/modules/words.js`](src/modules/words.js) | `vci-words="reveal"` on a large heading or line splits its text into words and staggers them in (fade + short rise) the first time it scrolls into view. Inner markup is kept; an inline `<svg>`/`<img>` arrives as one word. Settings: `stagger`, `duration`, `rise`, `easing`, `threshold`, `class` (default `is-revealed`). Events `vci:words:start` / `vci:words:done` for chaining further animation. Reduced motion shows plain text. |
 Every module exposes an API on `window.vci.<module>` and fires
 `vci:<module>:<event>` DOM events (bubbling, with `detail`), so site-specific
 code can listen instead of watching class mutations.
