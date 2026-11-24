@@ -1,4 +1,4 @@
-/*! narthex v0.5.2 — all modules — https://github.com/volentecreative/narthex
+/*! narthex v0.8.0 — all modules — https://github.com/volentecreative/narthex
  * Attribute-driven utilities for Webflow. MIT. */
 /* narthex core — shared plumbing every module uses.
  *
@@ -19,7 +19,7 @@
   var vci = w.vci = w.vci || {};
   if (vci.__core) return;
   vci.__core = true;
-  vci.version = '0.5.2';
+  vci.version = '0.8.0';
 
   // Set window.vci = { prefix: 'acme' } BEFORE the script loads to rebrand
   // every attribute. Everything below reads P rather than the literal.
@@ -1290,6 +1290,148 @@ vci.define('nav', function (vci) {
   return { isOpen: isOpen, open: open, close: close, toggle: toggle, measure: measure };
 });
 
+/* narthex/dropdown — a safe triangle for hover dropdowns (Webflow's, or any that open on mouseover).
+ *
+ * Moving the mouse diagonally from a tab down into its open panel often crosses a
+ * neighbouring tab, which opens instead — or the open one closes the moment the
+ * pointer leaves its tab. This holds both back while the pointer is aiming at the
+ * open panel: inside the triangle from where the pointer was a moment ago to the
+ * panel's top corners, and heading clearly downward. Resting on the other tab, or
+ * turning away, lets the held hover through after all.
+ *
+ * It works by holding the mouseover/mouseout events the dropdowns listen for (jQuery's
+ * mouseenter/mouseleave, as Webflow uses, ride on those), in the capture phase on the
+ * group, and replaying them when the hold ends. Nothing is restyled; touch is untouched.
+ *
+ * ROLES  (vci-dropdown="…")
+ *   group   a wrapper around the hover dropdowns (a navbar menu). Each dropdown inside it
+ *           is found by the item setting; its panel by the list setting.
+ *
+ * SETTINGS (vci-dropdown-<setting>, on the group or any ancestor / <script> / vci.settings.dropdown)
+ *   item          selector for one dropdown. Default .w-dropdown
+ *   list          selector for its panel, inside the item. Default .w-dropdown-list
+ *   class         open-state class on the panel. Default w--open
+ *   safe-triangle "false" to turn the hold off.
+ *   rest          ms resting on another tab inside the triangle before it opens anyway. Default 120.
+ *   slope         how steeply down (dy/dx) the pointer must move to count as aiming. Default 0.35.
+ *   pad           px the triangle's base overhangs the panel on each side. Default 12.
+ *
+ * EVENTS  vci:dropdown:hold on the item held back, detail { item, open }
+ *         vci:dropdown:release on it when the hold ends, detail { item, open, replayed }
+ * API     vci.dropdown.init(root?) · aiming(panelEl) — true while the pointer heads for it
+ */
+vci.define('dropdown', function (vci) {
+  'use strict';
+  var w = window, d = document;
+  var M = 'dropdown';
+  var pt = null, anchor = null, apex = null, mouse = true;
+
+  // The pointer now, a few px ago (anchor) and a few px before that (apex, the triangle's tip).
+  d.addEventListener('pointermove', function (e) {
+    mouse = e.pointerType === 'mouse';
+    var p = { x: e.clientX, y: e.clientY };
+    if (!anchor) anchor = apex = p;
+    var dx = p.x - anchor.x, dy = p.y - anchor.y;
+    if (dx * dx + dy * dy > 36) { apex = anchor; anchor = p; }
+    pt = p;
+  }, { passive: true, capture: true });
+
+  function side(p, a, b) { return (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y); }
+
+  function aiming(panel, group) {
+    if (!panel || !pt || !apex) return false;
+    var r = panel.getBoundingClientRect();
+    if (!r.width || !r.height || pt.y >= r.top) return false;
+    var slope = vci.num(vci.config(M, 'slope', '0.35', group), 0.35);
+    var pad = vci.num(vci.config(M, 'pad', '12', group), 12);
+    // Clearly heading down; a pointer low on the tabs otherwise makes a flat triangle
+    // that would hold ordinary sideways moves between tabs.
+    if (pt.y - apex.y < 1 || pt.y - apex.y < slope * Math.abs(pt.x - apex.x)) return false;
+    var l = { x: r.left - pad, y: r.top }, rr = { x: r.right + pad, y: r.top };
+    var d1 = side(pt, apex, l), d2 = side(pt, l, rr), d3 = side(pt, rr, apex);
+    return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+  }
+
+  function wire(group) {
+    if (group.__vciDropdown) return;
+    group.__vciDropdown = true;
+    var itemSel = vci.config(M, 'item', '.w-dropdown', group);
+    var listSel = vci.config(M, 'list', '.w-dropdown-list', group);
+    var openCls = vci.config(M, 'class', 'w--open', group);
+    var rest = vci.num(vci.config(M, 'rest', '120', group), 120);
+    var held = []; // events kept back, replayed in order when the hold ends
+    var timer = 0, replaying = false, holding = null;
+
+    function itemOf(node) {
+      var it = node && node.closest ? node.closest(itemSel) : null;
+      return it && group.contains(it) ? it : null;
+    }
+    function panelOf(it) { return it ? it.querySelector(listSel) : null; }
+    function openItem() {
+      var all = group.querySelectorAll(itemSel);
+      for (var i = 0; i < all.length; i++) { var p = panelOf(all[i]); if (p && p.classList.contains(openCls)) return all[i]; }
+      return null;
+    }
+    function on() { return mouse && vci.bool(vci.config(M, 'safe-triangle', 'true', group), true); }
+
+    function fire(target, type, related) {
+      target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: w, clientX: pt ? pt.x : 0, clientY: pt ? pt.y : 0, relatedTarget: related || null }));
+    }
+    // End the hold. With replay, act on where the pointer is NOW (not on every crossing it made
+    // on the way): leave the open dropdown if the pointer is outside it, and enter the one under it.
+    function release(replay) {
+      clearTimeout(timer);
+      var open = holding, out = null;
+      held.forEach(function (h) { if (h.type === 'mouseout') out = out || h.target; });
+      holding = null; held = [];
+      if (!open) return;
+      if (replay && pt) {
+        var over = d.elementFromPoint(pt.x, pt.y);
+        replaying = true;
+        if (!open.contains(over)) fire(out && out.isConnected ? out : open, 'mouseout', over);
+        var next = itemOf(over);
+        if (next && next !== open) fire(over, 'mouseover', null);
+        replaying = false;
+      }
+      vci.emit(open, 'dropdown:release', { item: open, open: open, replayed: !!replay });
+    }
+
+    function intercept(e) {
+      if (replaying) return;
+      var open = holding || openItem();
+      if (!open || !on()) return;
+      var from = itemOf(e.target), to = itemOf(e.relatedTarget);
+      // Only the crossings that would close the open one or open another.
+      var leaving = e.type === 'mouseout' && from === open && to !== open;
+      var entering = e.type === 'mouseover' && from && from !== open && itemOf(e.relatedTarget) !== from;
+      var other = e.type === 'mouseover' && from && from !== open && holding; // moving within the held tab
+      if (!leaving && !entering && !other) return;
+      if (!holding && !aiming(panelOf(open), group)) return;
+      e.stopImmediatePropagation();
+      held.push({ type: e.type, target: e.target });
+      if (!holding) { holding = open; vci.emit(open, 'dropdown:hold', { item: from || open, open: open }); }
+      // Resting on another tab: it gets its turn after all.
+      clearTimeout(timer);
+      timer = setTimeout(function () { release(true); }, rest);
+    }
+    group.addEventListener('mouseover', intercept, true);
+    group.addEventListener('mouseout', intercept, true);
+
+    // Each move while holding: reached the panel (or back on its tab) ends the hold quietly;
+    // turning away from the panel lets the held hovers through now.
+    d.addEventListener('pointermove', function () {
+      if (!holding) return;
+      var over = d.elementFromPoint(pt.x, pt.y);
+      if (holding.contains(over)) { release(false); return; }
+      if (!aiming(panelOf(holding), group)) release(true);
+    }, { passive: true });
+  }
+
+  function init(root) { vci.all(M, 'group', root).forEach(wire); }
+  vci.ready(function () { init(); });
+  return { init: init, aiming: function (panel) { return aiming(panel, panel); } };
+});
+
 /* narthex/scroll — native smooth anchor scrolling with a header offset.
  *
  * Webflow's own anchor handler (jQuery, "click.wf-scroll") animates the scroll
@@ -1337,4 +1479,271 @@ vci.define('scroll', function (vci) {
   }
   apply();
   return { apply: apply, enabled: enabled };
+});
+
+/* narthex/tooltip — a hover/focus label for icon buttons and anything else.
+ *
+ * MARK   vci-tooltip="Copy transcript"   the text to show. Left empty
+ *        (vci-tooltip=""), the element's aria-label is used instead, read at
+ *        show time — so a Play/Pause button's tooltip follows its label.
+ *        (The one module whose main attribute carries text rather than a
+ *        role: a tooltip has nothing else to say.)
+ *
+ * One shared tooltip element is appended to <body> and positioned (fixed) next
+ * to the element: above it, flipping below when there is no room, kept inside
+ * the viewport. It shows after a short delay for a mouse, at once for keyboard
+ * focus, never for touch, and hides on Escape, scroll, click and pointer-out.
+ * Listeners are delegated, so elements added later (a CMS list, script-built
+ * UI) need nothing. Screen readers hear each label once: the tooltip itself is
+ * aria-hidden, and only when its text differs from the element's accessible name
+ * does the element get aria-describedby pointing at it while shown.
+ *
+ * SETTINGS (vci-tooltip-<setting>, on the element or any ancestor / <script> / vci.settings.tooltip)
+ *   class      class on the tooltip element, for the site to style. Default tooltip.
+ *   placement  top (default) · bottom · left · right. Flips when it would leave the viewport.
+ *   offset     gap between element and tooltip, in px. Default 8.
+ *   delay      hover delay in ms. Default 300. Focus shows at once.
+ *   css        "false" to skip the built-in fade (the tooltip is still positioned).
+ *
+ * The tooltip carries vci-tooltip-state="open" while shown and
+ * vci-tooltip-placement="<side>" for the side it ended up on, so site CSS can
+ * draw an arrow or vary the motion by side.
+ *
+ * EVENTS  vci:tooltip:show / vci:tooltip:hide on the element, detail { el, text }
+ * API     vci.tooltip.show(el) · hide() · current()
+ */
+vci.define('tooltip', function (vci) {
+  'use strict';
+  var w = window, d = document;
+  var M = 'tooltip';
+  var A = vci.attrName;
+  var tip = null, owner = null, timer = null, described = false;
+
+  function textOf(el) {
+    var t = (vci.attr(el, M) || '').trim();
+    return t || (el.getAttribute('aria-label') || '').trim();
+  }
+
+  function ensure(el) {
+    if (!tip) {
+      tip = d.createElement('div');
+      tip.id = A('tooltip') + '-' + Math.random().toString(36).slice(2, 8);
+      tip.setAttribute('role', 'tooltip');
+      // Never read as page content: the element's own label already names it, and a tooltip
+      // that adds something reaches screen readers through aria-describedby (which reads
+      // hidden elements too). So nothing is announced twice.
+      tip.setAttribute('aria-hidden', 'true');
+      tip.setAttribute(A('tooltip-el'), '');
+      d.body.appendChild(tip);
+      var css = '[' + A('tooltip-el') + ']{position:fixed;top:0;left:0;z-index:2147483000;pointer-events:none;visibility:hidden}' +
+        '[' + A('tooltip-el') + '][' + A('tooltip-state') + '="open"]{visibility:visible}';
+      if (vci.bool(vci.config(M, 'css', 'true', el), true)) {
+        css += '[' + A('tooltip-el') + ']{opacity:0;transition:opacity .12s ease,visibility 0s linear .12s}' +
+          '[' + A('tooltip-el') + '][' + A('tooltip-state') + '="open"]{opacity:1;transition:opacity .12s ease}';
+      }
+      vci.css('tooltip', css);
+    }
+    tip.className = vci.config(M, 'class', 'tooltip', el);
+    return tip;
+  }
+
+  var FLIP = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+  function place(el) {
+    var gap = vci.num(vci.config(M, 'offset', '8', el), 8);
+    var want = vci.config(M, 'placement', 'top', el);
+    if (!FLIP[want]) want = 'top';
+    var r = el.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    var vw = d.documentElement.clientWidth, vh = d.documentElement.clientHeight;
+    function fits(side) {
+      if (side === 'top') return r.top - gap - th >= 0;
+      if (side === 'bottom') return r.bottom + gap + th <= vh;
+      if (side === 'left') return r.left - gap - tw >= 0;
+      return r.right + gap + tw <= vw;
+    }
+    var side = fits(want) || !fits(FLIP[want]) ? want : FLIP[want];
+    var x, y;
+    if (side === 'top' || side === 'bottom') {
+      x = r.left + r.width / 2 - tw / 2;
+      y = side === 'top' ? r.top - gap - th : r.bottom + gap;
+    } else {
+      x = side === 'left' ? r.left - gap - tw : r.right + gap;
+      y = r.top + r.height / 2 - th / 2;
+    }
+    x = Math.max(4, Math.min(x, vw - tw - 4));
+    y = Math.max(4, Math.min(y, vh - th - 4));
+    tip.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    tip.setAttribute(A('tooltip-placement'), side);
+  }
+
+  function show(el) {
+    clearTimeout(timer);
+    var text = textOf(el);
+    if (!text) return hide();
+    if (owner && owner !== el) hide();
+    ensure(el);
+    tip.textContent = text;
+    owner = el;
+    place(el);
+    tip.setAttribute(A('tooltip-state'), 'open');
+    described = text !== (el.getAttribute('aria-label') || '').trim() && text !== (el.textContent || '').trim();
+    if (described) el.setAttribute('aria-describedby', tip.id);
+    vci.emit(el, 'tooltip:show', { el: el, text: text });
+  }
+
+  function hide() {
+    clearTimeout(timer);
+    if (!owner) return;
+    var el = owner;
+    owner = null;
+    if (tip) tip.removeAttribute(A('tooltip-state'));
+    if (described && el.getAttribute('aria-describedby') === (tip && tip.id)) el.removeAttribute('aria-describedby');
+    described = false;
+    vci.emit(el, 'tooltip:hide', { el: el });
+  }
+
+  function target(node) { return vci.closest(node && node.nodeType === 1 ? node : node && node.parentElement, M); }
+
+  vci.ready(function () {
+    d.addEventListener('pointerover', function (e) {
+      if (e.pointerType && e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
+      var el = target(e.target);
+      if (!el || el === owner) return;
+      clearTimeout(timer);
+      if (owner) { show(el); return; } // moving between tooltips: no second wait
+      var delay = vci.num(vci.config(M, 'delay', '300', el), 300);
+      timer = setTimeout(function () { if (el.isConnected) show(el); }, delay);
+    });
+    d.addEventListener('pointerout', function (e) {
+      var el = target(e.target);
+      if (!el || (e.relatedTarget && el.contains(e.relatedTarget))) return;
+      clearTimeout(timer);
+      if (el === owner) hide();
+    });
+    d.addEventListener('focusin', function (e) {
+      var el = target(e.target);
+      if (!el) return;
+      // Keyboard focus only: a click also focuses, and then the tooltip would cover what was clicked.
+      try { if (!e.target.matches(':focus-visible')) return; } catch (x) { /* old browser: show anyway */ }
+      show(el);
+    });
+    d.addEventListener('focusout', function (e) { if (owner && target(e.target) === owner) hide(); });
+    d.addEventListener('pointerdown', hide, true);
+    d.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+    // Scrolling hides a shown tooltip but keeps a pending hover: a smooth scroll can still be
+    // settling when the pointer comes to rest, and the tooltip is placed when it shows.
+    function drop() { if (owner) hide(); }
+    w.addEventListener('scroll', drop, { passive: true, capture: true });
+    w.addEventListener('resize', drop);
+  });
+
+  return { show: show, hide: hide, current: function () { return owner; } };
+});
+
+/* narthex/words — staggered word-by-word reveal for a large line of text.
+ *
+ * Splits the text inside the element into words and brings them in one after
+ * another the first time the element scrolls into view: each word fades in and
+ * rises a short distance into place. Markup inside is kept as it is — links,
+ * spans with classes, icons — only the bare text is split, so a phrase wrapped
+ * in a no-wrap span still never breaks. An inline <svg> or <img> counts as one
+ * word, so an icon arrives in turn with the word beside it.
+ *
+ * ROLE  vci-words="reveal"   on the heading or paragraph to animate
+ *
+ * SETTINGS  (vci-words-<setting>, on the element or any ancestor)
+ *   stagger    ms between words. Default 45.
+ *   duration   ms each word takes. Default 700.
+ *   rise       CSS length each word rises from. Default 0.45em.
+ *   easing     Default cubic-bezier(.2,.7,.2,1).
+ *   threshold  0..1 of the element in view before it starts. Default 0.35.
+ *   class      class added to the element once every word is in. Default is-revealed.
+ *
+ * EVENTS  vci:words:start and vci:words:done on the element, detail { units }
+ *         — hook further animation (an icon drawing itself) onto these.
+ *
+ * Safe by construction: nothing is hidden unless this runs; reduced motion and
+ * browsers without IntersectionObserver / Web Animations get the plain text;
+ * only opacity and transform animate. Each word is an inline-block span marked
+ * vci-words-unit; spaces stay real text so wrapping and copy/paste are normal.
+ */
+vci.define('words', function (vci) {
+  'use strict';
+  var w = window, d = document;
+  var M = 'words';
+  var UNIT = vci.attrName('words-unit');
+  var motionOk = !!(w.IntersectionObserver && Element.prototype.animate) &&
+    !(w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  function split(el) {
+    var units = [];
+    (function walk(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (n) {
+        if (n.nodeType === 3) {
+          var parts = n.textContent.split(/(\s+)/);
+          if (parts.length < 2 && !parts[0].trim()) return;
+          var frag = d.createDocumentFragment();
+          parts.forEach(function (p) {
+            if (!p) return;
+            if (/^\s+$/.test(p)) { frag.appendChild(d.createTextNode(p)); return; }
+            var s = d.createElement('span');
+            s.setAttribute(UNIT, '');
+            s.style.display = 'inline-block';
+            s.textContent = p;
+            frag.appendChild(s);
+            units.push(s);
+          });
+          n.parentNode.replaceChild(frag, n);
+        } else if (n.nodeType === 1) {
+          var tag = n.tagName.toLowerCase();
+          if (tag === 'svg' || tag === 'img') { units.push(n); return; }
+          if (n.hasAttribute(UNIT)) { units.push(n); return; }
+          walk(n);
+        }
+      });
+    })(el);
+    return units;
+  }
+
+  function play(el, units) {
+    var stagger = vci.num(vci.config(M, 'stagger', 45, el), 45);
+    var dur = vci.num(vci.config(M, 'duration', 700, el), 700);
+    var rise = vci.config(M, 'rise', '0.45em', el);
+    var ease = vci.config(M, 'easing', 'cubic-bezier(.2,.7,.2,1)', el);
+    var cls = vci.config(M, 'class', 'is-revealed', el);
+    vci.emit(el, 'words:start', { units: units });
+    var last = null;
+    units.forEach(function (u, i) {
+      last = u.animate(
+        [{ opacity: 0, transform: 'translateY(' + rise + ')' }, { opacity: 1, transform: 'none' }],
+        { duration: dur, delay: i * stagger, easing: ease, fill: 'backwards' });
+      u.style.opacity = '';
+    });
+    var finish = function () { el.classList.add(cls); vci.emit(el, 'words:done', { units: units }); };
+    if (last) last.onfinish = finish; else finish();
+  }
+
+  function init(el) {
+    if (el.__vciWords) return;
+    el.__vciWords = true;
+    var units = split(el);
+    if (!motionOk || !units.length) return;
+    units.forEach(function (u) { u.style.opacity = '0'; });
+    var threshold = vci.num(vci.config(M, 'threshold', 0.35, el), 0.35);
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        io.disconnect();
+        play(el, units);
+      });
+    }, { threshold: threshold });
+    io.observe(el);
+    // Anything that needs it visible right now (find-in-page, focus, print) gets it.
+    var reveal = function () { io.disconnect(); units.forEach(function (u) { u.style.opacity = ''; }); };
+    el.addEventListener('focusin', reveal, { once: true });
+    w.addEventListener('beforeprint', reveal, { once: true });
+  }
+
+  function scan(root) { vci.all(M, 'reveal', root).forEach(init); }
+  vci.ready(function () { scan(); });
+  return { scan: scan, split: split };
 });

@@ -10,7 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const url = 'file://' + join(root, 'test/fixtures/migration-christtheking.html');
 let failures = 0;
 const ok = (c, m) => { if (c) console.log('  ✓', m); else { failures++; console.log('  ✗', m); } };
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
 async function open(q = '', viewport = { width: 400, height: 800 }) {
   const ctx = await browser.newContext({ viewport });
   const page = await ctx.newPage();

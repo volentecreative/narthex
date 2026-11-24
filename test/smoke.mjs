@@ -314,6 +314,98 @@ console.log('scroll');
   await ctx.close();
 }
 
+console.log('dropdown');
+{
+  const { page, ctx, errors } = await open({ viewport: { width: 800, height: 900 } });
+  await page.evaluate(() => document.getElementById('dropdown-demo').scrollIntoView({ behavior: 'instant', block: 'start' }));
+  await page.waitForTimeout(400);
+  const box = async (sel) => (await page.$(sel)).boundingBox();
+  const openOf = () => page.evaluate(() => ['dd-a', 'dd-b'].filter((id) => document.querySelector('#' + id + ' .w-dropdown-list').classList.contains('w--open')).join());
+  const a = await box('#dd-a .w-dropdown-toggle');
+  const reset = async () => { await page.mouse.move(700, 880); await page.waitForTimeout(50); await page.mouse.move(a.x + 60, a.y + 8); await page.mouse.move(a.x + 62, a.y + 10); };
+  // Diagonal from About's tab into its panel, through Connect's tab.
+  await reset();
+  ok(await openOf() === 'dd-a', 'hover opens the first dropdown');
+  await page.mouse.move(a.x + 230, a.y + 120, { steps: 14 });
+  ok(await openOf() === 'dd-a', 'diagonal into the panel across the next tab keeps it open');
+  await page.waitForTimeout(200);
+  ok(await openOf() === 'dd-a', '…and it stays open once the panel is reached');
+  // Sideways to the next tab: switches at once.
+  await reset();
+  await page.mouse.move(a.x + 120, a.y + 10, { steps: 6 });
+  ok(await openOf() === 'dd-b', 'a sideways move switches tabs at once');
+  // Heading down into the next tab and resting there: it opens after the rest.
+  await reset();
+  await page.mouse.move(a.x + 100, a.y + 30, { steps: 6 });
+  const during = await openOf();
+  await page.waitForTimeout(200);
+  ok(during === 'dd-a' && await openOf() === 'dd-b', 'resting on the next tab opens it after the pause');
+  // Turned off.
+  await page.evaluate(() => document.querySelector('[vci-dropdown="group"]').setAttribute('vci-dropdown-safe-triangle', 'false'));
+  await reset();
+  await page.mouse.move(a.x + 230, a.y + 120, { steps: 14 });
+  ok(await openOf() !== 'dd-a', 'safe-triangle="false" leaves hovers alone');
+  ok(!errors.length, 'no errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+}
+
+console.log('tooltip');
+{
+  const { page, ctx, errors } = await open();
+  const tip = () => page.evaluate(() => { const t = document.querySelector('[vci-tooltip-el]'); return t && { open: t.getAttribute('vci-tooltip-state') === 'open', text: t.textContent, cls: t.className, side: t.getAttribute('vci-tooltip-placement'), r: t.getBoundingClientRect().toJSON() }; });
+  await page.hover('[vci-tooltip="Copy transcript"]');
+  await page.waitForTimeout(450);
+  let t = await tip();
+  ok(t && t.open && t.text === 'Copy transcript' && t.cls === 'tooltip', 'mouse hover shows the text, with the site class');
+  const btn = await page.$eval('[vci-tooltip="Copy transcript"]', (e) => e.getBoundingClientRect().toJSON());
+  ok(t.side === 'top' && t.r.bottom <= btn.top && t.r.left >= 4, 'placed above, kept inside the viewport');
+  ok(await page.$eval('[vci-tooltip="Copy transcript"]', (e) => e.getAttribute('aria-describedby') === document.querySelector('[vci-tooltip-el]').id), 'aria-describedby while shown');
+  await page.mouse.move(390, 790);
+  t = await tip();
+  ok(!t.open, 'pointer-out hides');
+  ok(await page.$eval('[vci-tooltip="Copy transcript"]', (e) => !e.hasAttribute('aria-describedby')), 'aria-describedby removed');
+  await page.hover('[aria-label="Download transcript"]');
+  await page.waitForTimeout(450);
+  t = await tip();
+  ok(t.open && t.text === 'Download transcript', 'empty value falls back to aria-label');
+  ok(await page.$eval('[aria-label="Download transcript"]', (e) => !e.hasAttribute('aria-describedby')), 'no describedby when it repeats the label');
+  ok(await page.evaluate(() => document.querySelector('[vci-tooltip-el]').getAttribute('aria-hidden') === 'true'), 'tooltip is never read as page content');
+  await page.keyboard.press('Escape');
+  ok(!(await tip()).open, 'Escape hides');
+  await page.evaluate(() => vci.tooltip.show(document.querySelector('[vci-tooltip="Below"]')));
+  ok((await tip()).side === 'bottom', 'placement setting');
+  await page.evaluate(() => vci.tooltip.hide());
+  await page.evaluate(() => { const b = document.createElement('button'); b.setAttribute('vci-tooltip', 'Added later'); b.textContent = 'x'; b.id = 'late'; document.getElementById('tooltip-demo').appendChild(b); });
+  await page.hover('#late');
+  await page.waitForTimeout(450);
+  ok((await tip()).text === 'Added later', 'works on elements added after load');
+  ok(!errors.length, 'no errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+  const touch = await open({ hasTouch: true, isMobile: true });
+  await touch.page.tap('[vci-tooltip="Copy transcript"]');
+  await touch.page.waitForTimeout(450);
+  ok(await touch.page.evaluate(() => { const t = document.querySelector('[vci-tooltip-el]'); return !t || t.getAttribute('vci-tooltip-state') !== 'open'; }), 'touch never shows it');
+  await touch.ctx.close();
+}
+
+console.log('words');
+{
+  const { page, ctx, errors } = await open();
+  const h = '[vci-words="reveal"]';
+  ok(await page.$eval(h, (e) => e.textContent.replace(/\s+/g, ' ').trim() === 'We exist to delight in Him.'), 'text unchanged after split');
+  ok(await page.$eval(h, (e) => e.querySelectorAll('[vci-words-unit]').length === 6 && !!e.querySelector('.lead svg')), 'words split, inner markup and icon kept');
+  ok(await page.$eval(h, (e) => getComputedStyle(e.querySelector('[vci-words-unit]')).opacity === '0'), 'hidden until in view');
+  const done = page.$eval(h, (e) => new Promise((r) => e.addEventListener('vci:words:done', () => r(true), { once: true })));
+  await page.$eval(h, (e) => e.scrollIntoView({ block: 'center' }));
+  ok(await done, 'vci:words:done fires');
+  ok(await page.$eval(h, (e) => e.classList.contains('is-revealed') && [...e.querySelectorAll('[vci-words-unit]')].every((u) => getComputedStyle(u).opacity === '1')), 'all words visible, is-revealed added');
+  ok(!errors.length, 'no errors' + (errors.length ? ': ' + errors.join(' | ') : ''));
+  await ctx.close();
+  const still = await open({ reducedMotion: 'reduce' });
+  ok(await still.page.$eval(h, (e) => getComputedStyle(e.querySelector('[vci-words-unit]')).opacity === '1'), 'reduced motion: shown, not hidden');
+  await still.ctx.close();
+}
+
 console.log('bundle isolation');
 {
   const ctx = await browser.newContext();

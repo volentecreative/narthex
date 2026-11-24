@@ -1,9 +1,12 @@
 {
-  "version": "0.5.2",
+  "version": "0.8.0",
   "modules": [
     "modal",
     "accordion",
     "nav",
-    "scroll"
+    "dropdown",
+    "scroll",
+    "tooltip",
+    "words"
   ]
 }
